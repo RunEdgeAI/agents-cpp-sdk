@@ -98,6 +98,13 @@ The framework will check for API keys in the following order:
 2. Environment variables
 3. Command-line arguments
 
+#### Python Tool Setup
+In order to use the Python Code Execution Tool, ensure your Python environment is correctly configured so that the SDK can locate your Python runtime and libraries.
+```bash
+export PYTHONHOME=$(python3 -c "import sys; print(sys.prefix)")
+export PYTHONPATH=$(python3 -c "import sysconfig; print(sysconfig.get_path('stdlib'))")
+```
+
 ### Usage
 
 Here's a simple example of creating and running an autonomous agent:
