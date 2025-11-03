@@ -85,6 +85,7 @@ You can configure API keys and other settings in three ways:
    ```bash
    export OPENAI_API_KEY=your_api_key_here
    export ANTHROPIC_API_KEY=your_api_key_here
+   export GEMINI_API_KEY=your_api_key_here
    export WEBSEARCH_API_KEY=your_api_key_here
    ```
 
