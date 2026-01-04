@@ -55,7 +55,7 @@ int main(int argc, char* argv[]) {
     context->setLLM(llm);
 
     // Register tools
-    context->registerTool(tools::createWebSearchTool());
+    context->registerTool(tools::createWebSearchTool(llm));
     context->registerTool(tools::createWikipediaTool());
 
     // Create orchestrator-workers workflow

@@ -9,6 +9,7 @@
  */
 #pragma once
 
+#include <agents-cpp/http_client.h>
 #include <agents-cpp/llm_interface.h>
 
 namespace agents {
@@ -21,9 +22,10 @@ class OllamaLLM : public LLMInterface {
 public:
     /**
      * @brief Constructor
+     * @param api_key The API key
      * @param model The model to use
      */
-    OllamaLLM(const std::string& model = "llama3");
+    OllamaLLM(const std::string& api_key, const std::string& model = "llama3");
     /**
      * @brief Destructor
      */
@@ -117,10 +119,23 @@ public:
         const std::vector<std::shared_ptr<Tool>>& tools
     ) override;
 
+    /**
+     * @brief Stream chat with tools asynchronously
+     * @param messages The messages
+     * @param tools The tools
+     * @return AsyncGenerator of response chunks and possible toolcalls
+     */
+    AsyncGenerator<std::pair<std::string, ToolCalls>> streamChatAsyncWithTools(
+        const std::vector<Message>& messages,
+        const std::vector<std::shared_ptr<Tool>>& tools
+    ) override;
+
 private:
+    std::string api_key_;
     std::string api_base_ = "http://localhost:11434/api";
     std::string model_;
     LLMOptions options_;
+    HTTPClient http_client_;
 
     /**
      * @brief Convert Message list to Ollama API format
@@ -131,8 +146,8 @@ private:
      */
     JsonObject formatMessages(
         const std::vector<Message>& messages,
-        bool stream,
-        const std::vector<std::shared_ptr<Tool>>& tools);
+        bool stream = false,
+        const std::vector<std::shared_ptr<Tool>>& tools = std::vector<std::shared_ptr<Tool>>());
 
     /**
      * @brief Convert Ollama API response to LLMResponse
@@ -175,6 +190,22 @@ private:
      * @return True if the envelope was mapped, false otherwise
      */
     bool applyEnvelopeToOllamaMessage(const JsonObject& env, JsonObject& inout_msg);
+
+    /**
+     * @brief Helper for stripping data url prefix
+     * @param value input string
+     * @return std::string trimmed output string
+     */
+    static inline std::string strip_data_url_prefix(const std::string& value) {
+        if (value.rfind("data:", 0) == 0) {
+            size_t comma_pos = value.find(',');
+            if (comma_pos != std::string::npos && comma_pos + 1 < value.size()) {
+                return value.substr(comma_pos + 1);
+            }
+            return std::string();
+        }
+        return value;
+    }
 };
 
 } // namespace llms

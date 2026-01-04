@@ -72,7 +72,7 @@ public:
         /**
          * @brief Whether human feedback is enabled
          */
-        bool human_feedback_enabled = true;
+        bool human_feedback_enabled = false;
 
         /**
          * @brief The human in the loop function
@@ -112,7 +112,7 @@ public:
      * @param task The task to run
      * @param callback The callback to run
      */
-    void runAsync(const std::string& task, std::function<void(const JsonObject&)> callback);
+    virtual void runAsync(const std::string& task, std::function<void(const JsonObject&)> callback);
 
     /**
      * @brief Stop the agent

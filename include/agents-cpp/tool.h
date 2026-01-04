@@ -35,6 +35,17 @@ struct ToolResult {
 };
 
 /**
+ * @brief A ToolResult that represents a failure.
+ */
+struct ToolError : ToolResult {
+    /**
+     * @brief Construct a new ToolError object
+     * @param error The error data
+     */
+    ToolError(const JsonObject& error) : ToolResult(false, {}, error) {}
+};
+
+/**
  * @brief Callback type for tool execution
  * @note This is the callback type for tool execution. It is a function that takes a json object and returns a tool result.
  */
@@ -54,6 +65,15 @@ public:
      * @param description The description of the tool
      */
     Tool(const std::string& name, const std::string& description);
+
+    /**
+     * @brief Construct a new Tool object
+     *
+     * @param name The name of the tool
+     * @param description The description of the tool
+     * @param parameters The json parameters of the tool
+     */
+    Tool(const std::string& name, const std::string& description, const JsonObject& parameters);
 
     /**
      * @brief Destructor
@@ -89,6 +109,12 @@ public:
      * @param param The parameter to add
      */
     void addParameter(const Parameter& param);
+
+    /**
+     * @brief Add tool parameters from json definition
+     * @param params The parameters to add
+     */
+    void addParametersFromJson(const JsonObject& params);
 
     /**
      * @brief Set the execution callback

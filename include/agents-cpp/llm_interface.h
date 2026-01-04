@@ -179,6 +179,17 @@ public:
     );
 
     /**
+     * @brief Stream chat with tools using AsyncGenerator
+     * @param messages The messages to generate completion from
+     * @param tools The tools to use
+     * @return The AsyncGenerator of response chunks and tool calls
+     */
+    virtual AsyncGenerator<std::pair<std::string, ToolCalls>> streamChatAsyncWithTools(
+        const std::vector<Message>& messages,
+        const std::vector<std::shared_ptr<Tool>>& tools
+    );
+
+    /**
      * @brief Provider-optional: Upload a local media file to the provider's file storage and
      *        return a canonical media envelope (e.g., with fileUri). Default: not supported.
      * @param local_path Local filesystem path

@@ -45,7 +45,7 @@ Task<int> runStreamingChat(int argc, char* argv[]) {
     auto context = std::make_shared<Context>();
 
     // Configure the LLM
-    auto llm = createLLM("google", api_key, "gemini-2.0-flash");
+    auto llm = createLLM("google", api_key, "gemini-2.5-flash-lite");
 
     // Configure LLM options
     LLMOptions options;
@@ -53,6 +53,11 @@ Task<int> runStreamingChat(int argc, char* argv[]) {
     llm->setOptions(options);
 
     context->setLLM(llm);
+
+    // Register built-in tools
+    auto registry = tools::ToolRegistry::global();
+    registry.registerStandardTools(llm);
+    context->registerToolRegistry(registry);
 
     // Get user input
     Logger::info("Enter a question or task for the model (or 'exit' to quit):");

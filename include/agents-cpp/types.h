@@ -66,6 +66,12 @@ struct Parameter {
 using ParameterMap = std::map<std::string, Parameter>;
 
 /**
+ * @brief Tool calls type
+ * @note This is a tool calls type. It contains the tool name and parameters.
+ */
+using ToolCalls = std::vector<std::pair<std::string, JsonObject>>;
+
+/**
  * @brief Response from an LLM
  * @note This is the response from an LLM call. It contains the content of the response,
  * the tool calls that were made, and the usage metrics for the call.
@@ -78,7 +84,7 @@ struct LLMResponse {
     /**
      * @brief The tool calls that were made
      */
-    std::vector<std::pair<std::string, JsonObject>> tool_calls;
+    ToolCalls tool_calls;
     /**
      * @brief The usage metrics for the call
      */
@@ -153,6 +159,36 @@ enum class MemoryType {
      * @brief Working memory
      */
     WORKING
+};
+
+/**
+ * @brief MCP server config
+ */
+struct mcpConfig {
+    /**
+     * @brief Name of the server
+     */
+    std::string serverName;
+    /**
+     * @brief url of the server
+     */
+    std::string url;
+    /**
+     * @brief Type of server: sse | stdio
+     */
+    std::string type;
+    /**
+     * @brief Command to run
+     */
+    std::string command;
+    /**
+     * @brief args to pass to command
+     */
+    std::vector<std::string> args;
+    /**
+     * @brief env variables
+     */
+    nlohmann::ordered_json env_vars = nlohmann::ordered_json::object();
 };
 
 } // namespace agents

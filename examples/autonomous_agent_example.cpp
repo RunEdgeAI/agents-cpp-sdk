@@ -29,7 +29,7 @@ void detailedStepCallback(const AutonomousAgent::Step& step) {
         Logger::error("\nFailed!");
     }
 
-    Logger::info("\n------------------------------------");
+    Logger::info("------------------------------------");
 }
 
 // Custom callback for human-in-the-loop
@@ -39,9 +39,9 @@ bool detailedHumanApproval(const std::string& message, const JsonObject& context
         Logger::info("{}", context.dump(2));
     }
 
-    Logger::info("\n🔔 HUMAN APPROVAL REQUIRED 🔔");
+    Logger::info("🔔 HUMAN APPROVAL REQUIRED 🔔");
     Logger::info("{}", message);
-    Logger::info("\nApprove this step? (y/n/m - y: approve, n: reject, m: modify): ");
+    Logger::info("Approve this step? (y/n/m - y: approve, n: reject, m: modify): ");
     char response;
     std::cin >> response;
     std::cin.ignore(); // Clear the newline
@@ -115,7 +115,7 @@ int main() {
 
     // Register tools from tool registry
     auto registry = tools::ToolRegistry::global();
-    tools::registerStandardTools(registry, llm);
+    registry.registerStandardTools(llm);
     context->registerToolRegistry(registry);
 
     // Create a custom tool
@@ -211,7 +211,7 @@ int main() {
     agent.init();
 
     // Get user input
-    Logger::info("\n==================================================");
+    Logger::info("==================================================");
     Logger::info("                AUTONOMOUS AGENT                  ");
     Logger::info("==================================================");
     Logger::info("Enter a question or task for the agent (or 'exit' to quit):");
@@ -241,15 +241,17 @@ int main() {
             auto duration = std::chrono::duration_cast<std::chrono::seconds>(end_time - start_time).count();
 
             // Display the final result
-            Logger::info("\n==================================================");
+            Logger::info("==================================================");
             Logger::info("                  FINAL RESULT                    ");
             Logger::info("==================================================");
             Logger::info("{}", result["answer"].get<std::string>());
 
             // Display completion statistics
-            Logger::info("\n--------------------------------------------------");
-            Logger::info("Task completed in {} seconds", duration);
-            Logger::info("Total steps: {}", result["steps"].get<JsonArray>().size());
+            if (result.contains("steps")) {
+                Logger::info("--------------------------------------------------");
+                Logger::info("Task completed in {} seconds", duration);
+                Logger::info("Total steps: {}", result["steps"].get<JsonArray>().size());
+            }
 
             if (result.contains("tool_calls")) {
                 Logger::info("Tool calls: {}", result["tool_calls"].get<int>());

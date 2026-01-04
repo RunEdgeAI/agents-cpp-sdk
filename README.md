@@ -127,7 +127,7 @@ int main() {
     context->setLLM(llm);
 
     // Register tools
-    context->registerTool(tools::createWebSearchTool());
+    context->registerTool(tools::createWebSearchTool(llm));
 
     // Create the agent
     AutonomousAgent agent(context);

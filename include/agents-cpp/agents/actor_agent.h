@@ -85,7 +85,7 @@ public:
      * @param task The task to run
      * @param callback Callback function to call with result
      */
-    void runAsync(const std::string& task, std::function<void(const JsonObject&)> callback);
+    void runAsync(const std::string& task, std::function<void(const JsonObject&)> callback) override;
 
 
 /*! @cond PRIVATE */

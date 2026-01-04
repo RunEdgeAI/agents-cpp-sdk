@@ -46,7 +46,7 @@ Task<JsonObject> performResearchTask(std::shared_ptr<Context> context, const std
     Logger::info("Starting research on topic: {}", topic);
 
     // Perform a search to get initial information
-    auto search_tool = tools::createWebSearchTool();
+    auto search_tool = tools::createWebSearchTool(context->getLLM());
     auto search_result = co_await context->executeTool("web_search", {{"query", topic}});
 
     // Extract key points from the search result
@@ -181,8 +181,8 @@ int main(int argc, char* argv[]) {
     context->setLLM(llm);
 
     // Register tools
-    context->registerTool(tools::createWebSearchTool());
     context->registerTool(tools::createWikipediaTool());
+    context->registerTool(tools::createWebSearchTool(llm));
     context->registerTool(tools::createSummarizationTool(llm));
 
     // Menu-driven example to demonstrate various coroutines

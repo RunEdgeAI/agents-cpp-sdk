@@ -9,6 +9,7 @@
  */
 #pragma once
 
+#include <agents-cpp/http_client.h>
 #include <agents-cpp/llm_interface.h>
 
 namespace agents {
@@ -24,7 +25,8 @@ public:
      * @param api_key The API key
      * @param model The model to use
      */
-    GoogleLLM(const std::string& api_key = "", const std::string& model = "gemini-1.5-pro");
+    GoogleLLM(const std::string& api_key = "", const std::string& model = "gemini-2.0-flash");
+
     /**
      * @brief Destructor
      */
@@ -108,6 +110,28 @@ public:
     ) override;
 
     /**
+     * @brief Async completion chat
+     * @param messages The messages
+     * @param tools The tools
+     * @return AsyncGenerator<std::string> The async generator with response
+     */
+    AsyncGenerator<std::string> streamChatAsync(
+        const std::vector<Message>& messages,
+        const std::vector<std::shared_ptr<Tool>>& tools
+    ) override;
+
+    /**
+     * @brief Async completion chat with tools
+     * @param messages The messages
+     * @param tools The tools
+     * @return AsyncGenerator<std::string> The async generator with response and tool calls
+     */
+    AsyncGenerator<std::pair<std::string, ToolCalls>> streamChatAsyncWithTools(
+        const std::vector<Message>& messages,
+        const std::vector<std::shared_ptr<Tool>>& tools
+    ) override;
+
+    /**
      * @brief Upload a local media file to the provider's file storage and
      *        return a canonical media envelope (e.g., with fileUri).
      * @param local_path Local filesystem path
@@ -122,6 +146,7 @@ private:
     std::string api_base_ = "https://generativelanguage.googleapis.com/v1";
     std::string model_;
     LLMOptions options_;
+    HTTPClient http_client_;
 
     /**
      * @brief Convert Message list to Google API format
@@ -130,7 +155,8 @@ private:
      * @return The Google API format
      */
     JsonObject formatMessages(
-        const std::vector<Message>& messages, const std::vector<std::shared_ptr<Tool>>& tools);
+        const std::vector<Message>& messages,
+        const std::vector<std::shared_ptr<Tool>>& tools = std::vector<std::shared_ptr<Tool>>());
 
     /**
      * @brief Convert Google API response to LLMResponse
@@ -179,6 +205,16 @@ private:
      * @return The response
      */
     JsonObject uploadBytesFinalize(const std::string& upload_url, const std::string& data, int64_t content_length) const;
+
+    /**
+     * @brief Wait for file to become ACTIVE after upload
+     *
+     * @param file_uri    The file URI
+     * @param max_wait_ms Maximum wait time in milliseconds
+     * @param sleep_ms    Sleep time between checks in milliseconds
+     * @return true       if file is ACTIVE, false otherwise
+     */
+    bool waitForFileActive(const std::string& file_uri, int max_wait_ms, int sleep_ms) const;
 };
 
 } // namespace llms

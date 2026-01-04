@@ -140,6 +140,14 @@ public:
      */
     AsyncGenerator<std::string> streamChat(const std::string user_message, const std::vector<std::string> uris_or_data = {});
 
+    /**
+     * @brief  Multimodal streaming chat with tools
+     * @param user_message The user message to send
+     * @param uris_or_data Optional URIs or data to use
+     * @return The LLM response
+     */
+    AsyncGenerator<std::string> streamChatWithTools(const std::string user_message, const std::vector<std::string> uris_or_data = {});
+
 private:
     /**
      * @brief The LLM to use

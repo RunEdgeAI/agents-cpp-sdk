@@ -9,6 +9,7 @@
  */
 #pragma once
 
+#include <agents-cpp/http_client.h>
 #include <agents-cpp/llm_interface.h>
 
 namespace agents {
@@ -29,6 +30,7 @@ public:
      * @param model The model to use
      */
     AnthropicLLM(const std::string& api_key = "", const std::string& model = "claude-3-5-sonnet-20240620");
+
     /**
      * @brief Destructor
      */
@@ -111,18 +113,42 @@ public:
         std::function<void(const std::string&, bool)> callback
     ) override;
 
+    /**
+     * @brief Stream chat with AsyncGenerator
+     * @param messages The messages to generate completion from
+     * @param tools The tools to use
+     * @return The AsyncGenerator of response chunks
+     */
+    AsyncGenerator<std::string> streamChatAsync(
+        const std::vector<Message>& messages,
+        const std::vector<std::shared_ptr<Tool>>& tools
+    ) override;
+
+    /**
+     * @brief Provider-optional: Upload a local media file to the provider's file storage and
+     *        return a canonical media envelope (e.g., with fileUri). Default: not supported.
+     * @param local_path Local filesystem path
+     * @param mime The MIME type of the media file
+     * @param binary Optional binary content of the media file
+     * @return Optional envelope; std::nullopt if unsupported
+     */
+    std::optional<JsonObject> uploadMediaFile(const std::string& local_path, const std::string& mime, const std::string& binary) override;
 private:
     std::string api_key_;
     std::string api_base_ = "https://api.anthropic.com";
     std::string model_;
     LLMOptions options_;
+    HTTPClient http_client_;
 
     /**
      * @brief Convert Message list to Anthropic API format
      * @param messages The messages
      * @return The Anthropic API format
      */
-    JsonObject formatMessages(const std::vector<Message>& messages, bool stream, const std::vector<std::shared_ptr<Tool>>& tools);
+    JsonObject formatMessages(const std::vector<Message>& messages,
+        bool stream = false,
+        const std::vector<std::shared_ptr<Tool>>& tools = std::vector<std::shared_ptr<Tool>>()
+    );
 
     /**
      * @brief Convert Tool list to Anthropic API format
@@ -153,6 +179,24 @@ private:
      * @return True if the envelope was mapped, false otherwise
      */
     bool mapEnvelopeToAnthropic(const JsonObject& env, JsonObject& out_content_array);
+
+    /**
+     * @brief Upload bytes as a file to Anthropic
+     * @param name The file name
+     * @param data The file data
+     * @param mime The MIME type
+     * @return The response JSON object
+     */
+    JsonObject uploadBytesFinalize(const std::string& name, const std::string& data, const std::string& mime) const;
+
+    /**
+     * @brief Wait for uploaded file to become active
+     * @param file_uri The file URI
+     * @param max_wait_ms Maximum wait time in milliseconds
+     * @param sleep_ms Sleep interval in milliseconds
+     * @return True if the file is active, false otherwise
+     */
+    bool waitForFileActive(const std::string& file_uri, int max_wait_ms, int sleep_ms) const;
 };
 
 } // namespace llms

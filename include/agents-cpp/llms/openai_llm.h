@@ -9,6 +9,7 @@
  */
 #pragma once
 
+#include <agents-cpp/http_client.h>
 #include <agents-cpp/llm_interface.h>
 
 namespace agents {
@@ -24,7 +25,8 @@ public:
      * @param api_key The API key
      * @param model The model to use
      */
-    OpenAILLM(const std::string& api_key = "", const std::string& model = "gpt-4o-2024-05-13");
+    OpenAILLM(const std::string& api_key = "", const std::string& model = "gpt-4.1");
+
     /**
      * @brief Destructor
      */
@@ -107,18 +109,31 @@ public:
         std::function<void(const std::string&, bool)> callback
     ) override;
 
+    /**
+     * @brief Stream chat with AsyncGenerator
+     * @param messages The messages to generate completion from
+     * @param tools The tools to use
+     * @return The AsyncGenerator of response chunks
+     */
+    AsyncGenerator<std::string> streamChatAsync(
+        const std::vector<Message>& messages,
+        const std::vector<std::shared_ptr<Tool>>& tools
+    ) override;
 private:
     std::string api_key_;
     std::string api_base_ = "https://api.openai.com/v1";
     std::string model_;
     LLMOptions options_;
+    HTTPClient http_client_;
 
     /**
      * @brief Convert Message list to OpenAI API format
      * @param messages The messages
      * @return The OpenAI API format
      */
-    JsonObject formatMessages(const std::vector<Message>& messages, bool stream, const std::vector<std::shared_ptr<Tool>>& tools);
+    JsonObject formatMessages(const std::vector<Message>& messages,
+        bool stream = false,
+        const std::vector<std::shared_ptr<Tool>>& tools = std::vector<std::shared_ptr<Tool>>());
 
     /**
      * @brief Convert Tool list to OpenAI API format

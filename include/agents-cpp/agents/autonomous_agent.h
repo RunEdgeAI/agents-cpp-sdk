@@ -14,6 +14,7 @@
 #include <atomic>
 #include <condition_variable>
 #include <mutex>
+#include <regex>
 #include <thread>
 
 namespace agents {
@@ -99,6 +100,13 @@ public:
     Task<JsonObject> run(const std::string& task) override;
 
     /**
+     * @brief Run the agent with a callback
+     * @param task The task to run
+     * @param callback The callback for incremental updates
+     */
+    void runAsync(const std::string& task, std::function<void(const JsonObject&)> callback) override;
+
+    /**
      * @brief Stop the agent
      */
     void stop() override;
@@ -141,15 +149,31 @@ public:
      */
     Task<std::string> waitForFeedback(const std::string& message, const JsonObject& context) override;
 
-private:
+protected:
+    /**
+     * @brief The agent prompt
+     */
     std::string agent_prompt_;
+    /**
+     * @brief Planning strategy for the agent
+     */
     PlanningStrategy planning_strategy_ = PlanningStrategy::REACT;
+    /**
+     * @brief The steps executed so far
+     */
     std::vector<Step> steps_;
+    /**
+     * @brief Callback for when a step is completed
+     */
     std::function<void(const Step&)> step_callback_;
-
-    // Execution state
+    /**
+     * @brief Callback for task's incremental updates
+     */
+    std::function<void(const JsonObject&)> task_callback_;
+    /**
+     * @brief Execution state flag to indicate if the agent should stop
+     */
     std::atomic<bool> should_stop_{false};
-
     /**
      * @brief Promise for coroutine-based feedback
      */
@@ -216,23 +240,6 @@ private:
      * @return The plan
      */
     Task<JsonObject> planReact(const std::string& task);
-
-    /**
-     * @brief Split a string by newlines
-     * @param text The text to split
-     * @return The lines
-     */
-    std::vector<std::string> split_by_newline(const std::string& text) {
-        std::vector<std::string> lines;
-        std::istringstream iss(text);
-        std::string line;
-
-        // Read lines from the stringstream until the end, delimited by '\n'
-        while (std::getline(iss, line, '\n')) {
-            lines.push_back(line);
-        }
-        return lines;
-    }
 };
 
 } // namespace agents

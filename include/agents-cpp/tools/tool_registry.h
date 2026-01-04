@@ -80,6 +80,15 @@ public:
     JsonObject getToolSchemas() const;
 
     /**
+     * @brief Create and register standard tools
+     *
+     * @param llm Optional LLM interface for tools that require it
+     * @param mcpConfig Optional config of the MCP server
+     */
+    void registerStandardTools(const std::shared_ptr<LLMInterface> llm = nullptr,
+        const std::vector<mcpConfig> mcpConfig = {});
+
+    /**
      * @brief Get the global tool registry
      * @return The global tool registry
      */
@@ -88,14 +97,6 @@ public:
 private:
     std::map<std::string, std::shared_ptr<Tool>> tools_;
 };
-
-/**
- * @brief Create and register standard tools
- *
- * @param registry The tool registry to register tools with
- * @param llm Optional LLM interface for tools that require it
- */
-void registerStandardTools(ToolRegistry& registry, std::shared_ptr<LLMInterface> llm = nullptr);
 
 /**
  * @brief Creates a tool for executing shell commands
@@ -109,7 +110,7 @@ std::shared_ptr<Tool> createShellCommandTool();
  *
  * @return Pointer to tool
  */
-std::shared_ptr<Tool> createWebSearchTool();
+std::shared_ptr<Tool> createWebSearchTool(std::shared_ptr<LLMInterface> llm);
 
 /**
  * @brief Creates a tool for retrieving information from Wikipedia
