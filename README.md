@@ -306,7 +306,7 @@ public:
 
 ## 📚 Acknowledgements
 
-This implementation is inspired by Anthropic's article ["Building effective agents"](https://www.anthropic.com/research/building-effective-agents) and and re-engineered in C++ for real-time, usage on edge devices.
+This implementation is inspired by Anthropic's article ["Building effective agents"](https://www.anthropic.com/research/building-effective-agents) and re-engineered in C++ for real-time, low overhead usage on edge devices.
 
 ## ⚖️ License
 
