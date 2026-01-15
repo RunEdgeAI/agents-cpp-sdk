@@ -11,9 +11,9 @@
 
 - ⚙️ **Modular Architecture** — Compose agents from interchangeable components.
 - 🧩 **Multi-LLM Support** — Connect to multiple providers seamlessly:
-  - **OpenAI** (GPT-4o, GPT-4, GPT-3.5 Turbo)
-  - **Anthropic** (Claude 3 family models (Opus, Sonnet, Haiku)
-  - **Google** (Gemini family models (Pro, Flash)
+  - **OpenAI** (GPT-5, GPT-4o, GPT-4)
+  - **Anthropic** (Claude 3 family models: Opus, Sonnet, Haiku)
+  - **Google** (Gemini family models: Pro, Flash)
   - **Ollama/llama-cpp** (local models like Llama, Mistral, etc.)
 - ⚡ **Optimized for Speed and Memory** — Built in C++ with focus on performance.
 - 🔁 **Built-In Workflow Patterns**
