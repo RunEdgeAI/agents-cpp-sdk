@@ -310,7 +310,7 @@ This implementation is inspired by Anthropic's article ["Building effective agen
 
 ## ⚖️ License
 
-This project is licensed under a proprietary License - see the [LICENSE](./LICENSE.md) file for details.
+This project is licensed under an evaluation License - see the [LICENSE](./LICENSE.md) file for details.
 
 ---
 
