@@ -10,7 +10,7 @@
 ## 🚀 Features
 
 - ⚙️ **Modular Architecture** — Compose agents from interchangeable components.
-- 🧩 **Multi-LLM Support** — Connect to multiple providers seamlessly:
+- 🧩 **Multi-Provider Support** — Connect to multiple LLM providers seamlessly:
   - **OpenAI** (GPT-5, GPT-4o, GPT-4)
   - **Anthropic** (Claude 3 family models: Opus, Sonnet, Haiku)
   - **Google** (Gemini family models: Pro, Flash)
@@ -298,6 +298,16 @@ public:
     }
 };
 ```
+
+## 🚀 Running in Production?
+
+Don't let infrastructure slow you down. Our Pro version helps accelerate your roadmap with: 
+
+* **MCP Support:** Enable your agent to utilize local and remote MCPs.
+* **Premium Tools:** Access the complete set of tools supported natively including: weather, research, wolfram-alpha, and more.
+* **Voice SDK:** Access to Edge AI's Speech-to-Text, Text-to-Speech, and Voice-Activity-Detection libraries and models.
+
+👉 **[Start a free Pro trial](https://runedge.ai/pricing)**
 
 ## 🆘 Support
 
