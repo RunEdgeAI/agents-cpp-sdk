@@ -1,5 +1,5 @@
 [TOC]
-# 🧠 Agents-SDK - A High Performance C++ Framework for AI Agents
+# Agents-SDK - A High Performance C++ Framework for AI Agents
 
 ![Linux](https://img.shields.io/badge/Linux-FCC624?logo=linux&logoColor=black)
 ![macOS](https://img.shields.io/badge/macOS-000000?logo=apple&logoColor=F0F0F0)
@@ -7,30 +7,30 @@
 
 **Agents-SDK** is a **portable, high-performance C++ framework** for building **on-device, agentic AI systems** — think **LangChain for the edge**. This SDK is purpose-built for developers who want to create **local-first AI agents** that can reason, plan, and act without relying on the cloud.
 
-## 🚀 Features
+## Features
 
-- ⚙️ **Modular Architecture** — Compose agents from interchangeable components.
-- 🧩 **Multi-Provider Support** — Connect to multiple LLM providers seamlessly:
+- **Modular Architecture** — Compose agents from interchangeable components.
+- **Multi-Provider Support** — Connect to multiple LLM providers seamlessly:
   - **OpenAI** (GPT-5, GPT-4o, GPT-4)
   - **Anthropic** (Claude 3 family models: Opus, Sonnet, Haiku)
   - **Google** (Gemini family models: Pro, Flash)
   - **Ollama/llama-cpp** (local models like Llama, Mistral, etc.)
-- ⚡ **Optimized for Speed and Memory** — Built in C++ with focus on performance.
-- 🔁 **Built-In Workflow Patterns**
+- **Optimized for Speed and Memory** — Built in C++ with focus on performance.
+- **Built-In Workflow Patterns**
   - Prompt Chaining
   - Routing
   - Parallelization
   - Orchestrator-Workers
   - Evaluator-Optimizer
-- 🤖 **Autonomous Agents** — Supports modern reasoning strategies:
+- **Autonomous Agents** — Supports modern reasoning strategies:
   - ReAct (Reason + Act)
   - CoT (Chain-of-Thought)  [In Development]
   - Plan and Execute
   - Zero-Shot [In Development]
   - Reflexion [In Development]
-- 🧠 **Extensible Tooling System** — Plug in your own tools or use built-in ones (Web Search, Wikipedia, Python Executor, etc).
+- **Extensible Tooling System** — Plug in your own tools or use built-in ones (Web Search, Wikipedia, Python Executor, etc).
 
-## ⚙️ Requirements
+## Requirements
 
 - C++20 compatible compiler (GCC 14+, Clang 17+, MSVC 2022+)
 - Bazel 8.3.1+
@@ -40,7 +40,7 @@
    - nlohmann/json
    - spdlog
 
-## 🧭 Quick Start
+## Quick Start
 
 ### Installation
 
@@ -219,7 +219,7 @@ You can modify examples/simple_agent.cpp to explore different configurations:
   agent.setPlanningStrategy(AutonomousAgent::PlanningStrategy::COT);
   ```
 
-## 🧪 Included Examples
+## Included Examples
 
 The repository includes several examples demonstrating different workflow patterns:
 
@@ -240,7 +240,7 @@ Run examples available:
 bazel run examples:<simple_agent> -- your_api_key_here
 ```
 
-## 📂 Project Structure
+## Project Structure
 
 - `lib/`: Public library for SDK
 - `include/agents-cpp/`: Public headers
@@ -257,7 +257,7 @@ bazel run examples:<simple_agent> -- your_api_key_here
   - `llms/`: LLM provider implementations
 - `bin/examples/`: Example applications
 
-## 🛠️ Extending the SDK
+## Extending the SDK
 
 ### Adding Custom Tools
 
@@ -299,7 +299,7 @@ public:
 };
 ```
 
-## 🚀 Running in Production?
+## Running in Production?
 
 Don't let infrastructure slow you down. Our Pro version helps accelerate your roadmap with: 
 
@@ -309,16 +309,16 @@ Don't let infrastructure slow you down. Our Pro version helps accelerate your ro
 
 👉 **[Start a free Pro trial](https://runedge.ai/pricing)**
 
-## 🆘 Support
+## Support
 
 - Email: support@runedge.ai
 - Discord: https://discord.gg/D5unWmt8
 
-## 📚 Acknowledgements
+## Acknowledgements
 
 This implementation is inspired by Anthropic's article ["Building effective agents"](https://www.anthropic.com/research/building-effective-agents) and re-engineered in C++ for real-time, low overhead usage on edge devices.
 
-## ⚖️ License
+## License
 
 This project is licensed under an evaluation License - see the [LICENSE](./LICENSE.md) file for details.
 
