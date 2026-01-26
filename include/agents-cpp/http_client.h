@@ -81,17 +81,6 @@ public:
     HTTPClient& operator=(const HTTPClient&) = delete;
 
     /**
-     * @brief Move constructor for HTTPClient object
-     * @param other The other HTTPClient to move from
-     */
-    HTTPClient(HTTPClient&&) = default;
-    /**
-     * @brief Move assignment operator for HTTPClient object
-     * @param other The other HTTPClient to move from
-     */
-    HTTPClient& operator=(HTTPClient&&) = default;
-
-    /**
      * @brief Instance GET (Persistent)
      * @param url The URL to GET
      * @param headers The headers to include

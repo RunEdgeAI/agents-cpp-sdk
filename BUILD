@@ -28,10 +28,18 @@ cc_import(
         "//conditions:default": None,
     }),
     deps = [
+        "@cpp-httplib//:httplib",
         "@nlohmann_json//:json",
         ":python"
     ],
     visibility = ["//visibility:public"]
+)
+
+exports_files([
+        ".env",
+        "sample_media/ui/index.html",
+    ],
+    visibility = ["__subpackages__"]
 )
 
 # End of BUILD file

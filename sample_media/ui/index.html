@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Voice Agent</title>
+    <style>
+        body {
+            background-color: #050505;
+            color: #fff;
+            font-family: -apple-system, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            overflow: hidden;
+        }
+
+        /* --- CONTAINER --- */
+        .visualizer-container {
+            position: relative;
+            width: 400px;
+            height: 250px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        /* --- ORB --- */
+        .orb {
+            position: relative;
+            width: 150px;
+            height: 150px;
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(255, 255, 255, 1) 0%, rgba(100, 100, 255, 0.5) 50%, rgba(0, 0, 0, 0) 70%);
+            box-shadow: 0 0 60px rgba(100, 149, 237, 0.6);
+            transition: all 0.5s ease;
+            z-index: 20;
+            animation: breathe 4s infinite ease-in-out;
+        }
+
+        /* STATES */
+        .orb.listening {
+            background: radial-gradient(circle, rgba(255, 100, 100, 1) 0%, rgba(200, 50, 50, 0.6) 50%, rgba(0, 0, 0, 0) 70%);
+            box-shadow: 0 0 80px rgba(255, 50, 50, 0.6);
+            transform: scale(1.1);
+            animation: breathe 3s infinite ease-in-out;
+        }
+
+        .orb.processing {
+            background: radial-gradient(circle, rgba(255, 255, 200, 1) 0%, rgba(255, 215, 0, 0.6) 50%, rgba(0, 0, 0, 0) 70%);
+            box-shadow: 0 0 90px rgba(255, 215, 0, 0.8);
+            transform: scale(1.0);
+            animation: rotate-glow 2s infinite linear;
+        }
+
+        .orb.speaking {
+            background: radial-gradient(circle, rgba(100, 150, 255, 1) 0%, rgba(50, 100, 255, 0.6) 50%, rgba(0, 0, 0, 0) 70%);
+            box-shadow: 0 0 90px rgba(100, 150, 255, 0.8);
+            transform: scale(1.05);
+        }
+
+        /* --- CANVAS --- */
+        canvas {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 10;
+            pointer-events: none;
+        }
+
+        @keyframes breathe {
+            0% { transform: scale(0.95); opacity: 0.8; }
+            50% { transform: scale(1.05); opacity: 1; }
+            100% { transform: scale(0.95); opacity: 0.8; }
+        }
+
+        @keyframes rotate-glow {
+            0% { filter: hue-rotate(0deg); }
+            100% { filter: hue-rotate(360deg); }
+        }
+
+        /* --- TYPOGRAPHY --- */
+        h1 {
+            font-weight: 300;
+            font-size: 24px;
+            margin-bottom: 5px;
+            z-index: 30;
+        }
+
+        h2 {
+            font-weight: 600;
+            font-size: 32px;
+            background: linear-gradient(90deg, #fff, #aaa);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-top: 0;
+            z-index: 30;
+        }
+
+        #status-text {
+            margin-top: 5px;
+            font-size: 14px;
+            color: #888;
+            height: 20px;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            z-index: 30;
+        }
+        .status-processing {
+            color: #ffd700 !important;
+            text-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
+        }
+
+        button {
+            margin-top: 15px;
+            padding: 15px 40px;
+            border-radius: 30px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            background: rgba(255, 255, 255, 0.05);
+            color: white;
+            font-size: 16px;
+            cursor: pointer;
+            backdrop-filter: blur(10px);
+            transition: all 0.2s;
+            z-index: 30;
+        }
+        button:hover {
+            background: rgba(255, 255, 255, 0.15);
+            transform: scale(1.05);
+        }
+        /* Added disabled state from previous step */
+        button:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+        #chat-container {
+            width: 90%;
+            max-width: 600px;
+            height: 25vh;
+            overflow-y: auto;
+            margin-top: 30px;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            padding-top: 15px;
+            mask-image: linear-gradient(to bottom, transparent, black 20%);
+            -webkit-mask-image: linear-gradient(to bottom, transparent, black 20%);
+            scroll-behavior: smooth;
+            z-index: 30;
+        }
+
+        #transcript-log {
+            font-family: 'Courier New', monospace;
+            color: rgba(255, 255, 255, 0.7);
+            white-space: pre-wrap;
+            font-size: 14px;
+            line-height: 1.6;
+            margin: 0;
+        }
+
+        /* --- BUTTON CONTROLS --- */
+        .controls {
+            display: flex; gap: 15px; margin-top: 15px; z-index: 30; height: 50px; align-items: center;
+        }
+
+        /* Stop Button Overrides (Circular Icon) */
+        #btn-stop {
+            margin-top: 0; /* Override generic margin */
+            padding: 0;    /* Remove text padding */
+            width: 50px;
+            height: 50px;
+            display: none; /* Hidden by default */
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            background: rgba(255, 50, 50, 0.15);
+            border-color: rgba(255, 100, 100, 0.3);
+            color: #ffaaaa;
+        }
+        #btn-stop:hover { background: rgba(255, 50, 50, 0.4); }
+        #btn-stop svg { width: 16px; height: 16px; fill: #ffaaaa; }
+
+        #btn-talk { margin-top: 0; } /* Remove extra margin inside flex container */
+    </style>
+</head>
+
+<body>
+    <div class="visualizer-container">
+        <canvas id="waveCanvas"></canvas>
+        <div class="orb"></div>
+    </div>
+
+    <h1>Hi Andrew</h1>
+    <h2>How can I help you?</h2>
+    <div id="status-text"></div>
+
+    <div class="controls">
+        <button id="btn-talk" onmousedown='triggerListen()'>Push to Talk</button>
+        <button id="btn-stop" onmousedown='triggerStop()' title="Stop Generation">
+            <svg viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2" ry="2"></rect></svg>
+        </button>
+    </div>
+
+    <div id="chat-container">
+        <pre id="transcript-log"></pre>
+    </div>
+
+    <script>
+        function triggerListen() { fetch('/api/trigger', { method: 'POST' }).catch(console.error); }
+        function triggerStop() { fetch('/api/stop', { method: 'POST' }).catch(console.error); }
+
+        // --- RETINA-SHARP WAVE ENGINE ---
+        const canvas = document.getElementById('waveCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // 1. Setup High DPI Scaling
+        const size = 400; // Visual Size
+        const dpr = window.devicePixelRatio || 1;
+        canvas.width = size * dpr;
+        canvas.height = size * dpr;
+        canvas.style.width = `${size}px`;
+        canvas.style.height = `${size}px`;
+        ctx.scale(dpr, dpr); // Scale coordinate system
+
+        let time = 0;
+        let targetAmplitude = 0;
+        let currentAmplitude = 0;
+
+        function drawSmoothWave(color, peaks, speed, phaseOffset) {
+            ctx.beginPath();
+            ctx.strokeStyle = color;
+            ctx.lineWidth = 3;
+            ctx.shadowBlur = 10;
+            ctx.shadowColor = color;
+
+            // Using the Logical Size (400 / 2 = 200), NOT canvas.width
+            const centerX = size / 2;
+            const centerY = size / 2;
+            const baseRadius = 75;
+
+            for (let angle = 0; angle <= Math.PI * 2; angle += 0.01) {
+                const noise = Math.sin(angle * peaks + time * speed + phaseOffset)
+                    * Math.cos(angle * (peaks / 2) - time * (speed / 2));
+                const r = baseRadius + (Math.abs(noise) * currentAmplitude);
+                const x = centerX + r * Math.cos(angle);
+                const y = centerY + r * Math.sin(angle);
+                if (angle === 0) ctx.moveTo(x, y);
+                else ctx.lineTo(x, y);
+            }
+            ctx.closePath();
+            ctx.stroke();
+            ctx.shadowBlur = 0;
+        }
+
+        function animate() {
+            // Clear using full physical size to avoid trails
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            time += 0.03;
+            currentAmplitude += (targetAmplitude - currentAmplitude) * 0.1;
+
+            if (currentAmplitude > 1) {
+                drawSmoothWave('#007bff', 6, 1.5, 0);       // Blue
+                drawSmoothWave('#ffd700', 3, 0.8, 4);       // Gold
+            }
+            requestAnimationFrame(animate);
+        }
+        animate();
+
+        // --- MAIN LOOP ---
+        setInterval(() => {
+            fetch('/api/transcript?t=' + Date.now())
+                .then(response => {
+                    const state = response.headers.get("X-Voice-Status");
+                    const orb = document.querySelector('.orb');
+                    const statusText = document.getElementById('status-text');
+                    // Button Refs
+                    const btnTalk = document.getElementById('btn-talk');
+                    const btnStop = document.getElementById('btn-stop');
+
+                    let targetClass = "orb";
+                    let targetText = "";
+                    targetAmplitude = 0;
+
+                    if (state === "1") {
+                        targetClass = "orb listening";
+                        targetText = "Listening...";
+                    } else if (state === "2") {
+                        targetClass = "orb processing";
+                        targetText = "Thinking...";
+                    } else if (state === "3") {
+                        targetClass = "orb speaking";
+                        targetText = "Speaking...";
+                        targetAmplitude = 50;
+                    } else {
+                        // Defaults (Idle)
+                        btnStop.style.display = 'none';
+                        btnTalk.disabled = false;
+                        btnTalk.innerText = "Push to Talk";
+                    }
+
+                    if (state !== "0") {
+                        // Show stop and interrupt in all non-idle states
+                        btnStop.style.display = 'flex'; // Show Stop
+                        btnTalk.innerText = "Interrupt";
+                    }
+
+                    if (orb.className !== targetClass) {
+                        orb.className = targetClass;
+                        statusText.innerText = targetText;
+                        statusText.className = (state === "2") ? 'status-processing' : '';
+                    }
+                    return response.text();
+                })
+                .then(text => {
+                    const log = document.getElementById('transcript-log');
+                    const container = document.getElementById('chat-container');
+                    if (log.innerText !== text) {
+                        log.innerText = text;
+                        container.scrollTop = container.scrollHeight;
+                    }
+                })
+                .catch(console.error);
+        }, 200);
+    </script>
+</body>
+</html>

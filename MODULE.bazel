@@ -8,6 +8,9 @@ module(name = "agents", version = "0.1.0")
 bazel_dep(name = "platforms", version = "0.0.11")
 bazel_dep(name = "rules_cc", version = "0.1.4")
 
+# HTTP library
+bazel_dep(name = "cpp-httplib", version = "0.16.3.bzl.1")
+
 # JSON library
 bazel_dep(name = "nlohmann_json", version = "3.11.3")
 
