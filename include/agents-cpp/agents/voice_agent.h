@@ -182,7 +182,7 @@ private:
 static void runUI(const std::string& media_dir, httplib::Server& svr, VoiceAgent& agent) {
     // 1. SERVE THE UI
     svr.Get("/", [&](const httplib::Request&, httplib::Response& res) {
-        std::string html = Utils::loadHtmlFile(media_dir + "/ui/index.html");
+        std::string html = Utils::loadHtmlFile(media_dir);
         res.set_content(html, "text/html");
     });
 
