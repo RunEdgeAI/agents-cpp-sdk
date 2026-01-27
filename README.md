@@ -30,10 +30,10 @@
   - Reflexion [In Development]
 - **Extensible Tooling System** — Plug in your own tools or use built-in ones (Web Search, Wikipedia, Python Executor, etc).
 
-## Requirements
+## Pre-requisites
 
 - C++20 compatible compiler (GCC 14+, Clang 17+, MSVC 2022+)
-- Bazel 8.3.1+
+- Bazel 8.3.1+ (https://bazel.build/install)
 
 - Dependencies (already provided for convenience)
    - python3 (3.11+)
