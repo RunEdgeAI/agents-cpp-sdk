@@ -1,0 +1,1690 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>In-Car AI</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        :root {
+            --bg: #07070a;
+            --glass: rgba(255, 255, 255, 0.04);
+            --glass-border: rgba(255, 255, 255, 0.08);
+            --text-muted: rgba(255, 255, 255, 0.4);
+            --state-color: 130, 100, 255;
+            --state-glow: rgba(130, 100, 255, 0.3);
+            --nav-accent: 70, 180, 130;
+            --nav-active: 100, 220, 160;
+            --nav-width: 420px;
+            --music-accent: 230, 120, 255;
+            --music-width: 320px;
+        }
+
+        body {
+            background: var(--bg);
+            color: #fff;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            height: 100vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* --- FILM GRAIN OVERLAY --- */
+        .grain {
+            position: fixed;
+            inset: 0;
+            z-index: 9999;
+            pointer-events: none;
+            opacity: 0.02;
+        }
+        .grain svg { width: 100%; height: 100%; }
+
+        /* --- VIGNETTE --- */
+        .vignette {
+            position: fixed;
+            inset: 0;
+            background: radial-gradient(ellipse at center, transparent 60%, var(--bg) 100%);
+            pointer-events: none;
+            z-index: 2;
+        }
+
+        /* --- MAIN LAYOUT --- */
+        .dashboard {
+            position: relative;
+            z-index: 10;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        /* --- LEFT PANEL: Navigation (overlaid, slides in from left) --- */
+        .nav-panel {
+            position: absolute;
+            top: 0;
+            left: 0;
+            bottom: 0;
+            width: var(--nav-width);
+            z-index: 20;
+            display: flex;
+            flex-direction: column;
+            border-right: 1px solid var(--glass-border);
+            background: rgba(10, 10, 14, 0.97);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            transform: translateX(-100%);
+            transition: transform 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .nav-panel.active {
+            transform: translateX(0);
+        }
+
+        /* --- PANEL COLLAPSE BUTTONS --- */
+        .panel-collapse {
+            position: absolute;
+            top: 10px;
+            z-index: 30;
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            border: 1px solid var(--glass-border);
+            background: rgba(255, 255, 255, 0.06);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background 0.2s ease, transform 0.2s ease;
+        }
+        .panel-collapse:hover {
+            background: rgba(255, 255, 255, 0.12);
+        }
+        .panel-collapse:active {
+            transform: scale(0.9);
+        }
+        .panel-collapse svg {
+            width: 14px;
+            height: 14px;
+            fill: none;
+            stroke: rgba(255, 255, 255, 0.5);
+            stroke-width: 2;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+        }
+        .panel-collapse:hover svg {
+            stroke: rgba(255, 255, 255, 0.85);
+        }
+
+        .nav-panel .panel-collapse {
+            right: 10px;
+        }
+
+        .music-panel .panel-collapse {
+            left: 10px;
+        }
+
+        /* --- MAP --- */
+        .nav-map-container {
+            width: var(--nav-width);
+            height: 240px;
+            flex-shrink: 0;
+            border-bottom: 1px solid var(--glass-border);
+            position: relative;
+        }
+
+        #nav-map {
+            width: 100%;
+            height: 100%;
+            background: #0d0d14;
+        }
+
+        /* Override Leaflet for dark theme */
+        .leaflet-container { background: #0d0d14 !important; }
+        .leaflet-control-attribution { display: none !important; }
+        .leaflet-control-zoom {
+            border: 1px solid rgba(255,255,255,0.1) !important;
+        }
+        .leaflet-control-zoom a {
+            background: rgba(10,10,18,0.9) !important;
+            color: rgba(255,255,255,0.6) !important;
+            border-color: rgba(255,255,255,0.08) !important;
+        }
+        .leaflet-control-zoom a:hover {
+            background: rgba(20,20,30,0.95) !important;
+            color: #fff !important;
+        }
+
+        /* --- NAV HEADER --- */
+        .nav-header {
+            width: var(--nav-width);
+            padding: 16px 20px 12px;
+            border-bottom: 1px solid var(--glass-border);
+            flex-shrink: 0;
+        }
+
+        .nav-header-label {
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            color: rgba(var(--nav-accent), 0.7);
+            margin-bottom: 6px;
+        }
+
+        .nav-route-summary {
+            display: none;
+            gap: 14px;
+            align-items: baseline;
+        }
+        .nav-route-summary.active { display: flex; }
+
+        .nav-duration {
+            font-size: 28px;
+            font-weight: 600;
+            color: #fff;
+            line-height: 1;
+        }
+
+        .nav-distance {
+            font-size: 13px;
+            color: var(--text-muted);
+        }
+
+        .nav-destination {
+            font-size: 12px;
+            color: rgba(255, 255, 255, 0.45);
+            margin-top: 4px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        /* --- CURRENT INSTRUCTION --- */
+        .nav-current {
+            display: none;
+            width: var(--nav-width);
+            padding: 14px 20px;
+            background: rgba(var(--nav-active), 0.06);
+            border-bottom: 1px solid rgba(var(--nav-active), 0.12);
+            flex-shrink: 0;
+        }
+        .nav-current.active { display: block; }
+
+        .nav-current-label {
+            font-size: 9px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            color: rgba(var(--nav-active), 0.6);
+            margin-bottom: 4px;
+        }
+
+        .nav-current-instruction {
+            font-size: 16px;
+            font-weight: 500;
+            color: rgba(var(--nav-active), 1);
+            line-height: 1.35;
+        }
+
+        .nav-current-detail {
+            font-size: 11px;
+            color: var(--text-muted);
+            margin-top: 4px;
+        }
+
+        /* --- STEP LIST --- */
+        .nav-steps {
+            flex: 1;
+            overflow-y: auto;
+            padding: 4px 0;
+            width: var(--nav-width);
+        }
+
+        .nav-steps::-webkit-scrollbar { width: 3px; }
+        .nav-steps::-webkit-scrollbar-track { background: transparent; }
+        .nav-steps::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.08);
+            border-radius: 2px;
+        }
+
+        .nav-step {
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            padding: 12px 20px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+            transition: background 0.2s ease;
+        }
+
+        .nav-step.current-step {
+            background: rgba(var(--nav-active), 0.05);
+        }
+
+        .nav-step-num {
+            width: 22px;
+            height: 22px;
+            border-radius: 50%;
+            background: rgba(var(--nav-accent), 0.1);
+            border: 1px solid rgba(var(--nav-accent), 0.2);
+            color: rgba(var(--nav-accent), 0.8);
+            font-size: 10px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            margin-top: 1px;
+        }
+
+        .nav-step.current-step .nav-step-num {
+            background: rgba(var(--nav-active), 0.2);
+            border-color: rgba(var(--nav-active), 0.4);
+            color: rgba(var(--nav-active), 1);
+        }
+
+        .nav-step-body { flex: 1; min-width: 0; }
+
+        .nav-step-instruction {
+            font-size: 12px;
+            color: rgba(255, 255, 255, 0.7);
+            line-height: 1.45;
+        }
+
+        .nav-step.current-step .nav-step-instruction {
+            color: rgba(255, 255, 255, 0.95);
+        }
+
+        .nav-step-meta {
+            font-size: 10px;
+            color: var(--text-muted);
+            margin-top: 2px;
+        }
+
+        .nav-step-destination .nav-step-num {
+            background: rgba(var(--nav-active), 0.2);
+            border-color: rgba(var(--nav-active), 0.4);
+            color: rgba(var(--nav-active), 1);
+        }
+
+        /* --- CENTER PANEL: Voice Assistant (always centered) --- */
+        .assistant-panel {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            position: relative;
+        }
+
+        .ambient-glow {
+            position: absolute;
+            top: 5%;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 600px;
+            height: 600px;
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(var(--state-color), 0.10) 0%, transparent 70%);
+            filter: blur(60px);
+            pointer-events: none;
+            z-index: 1;
+            transition: background 1.2s ease;
+        }
+
+        .top-section {
+            position: relative;
+            z-index: 10;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding-top: 4vh;
+            flex-shrink: 0;
+        }
+
+        .orb-wrapper {
+            position: relative;
+            width: 280px;
+            height: 280px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            animation: float 6s ease-in-out infinite;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-6px); }
+        }
+
+        .orb {
+            position: relative;
+            width: 140px;
+            height: 140px;
+            border-radius: 60% 40% 50% 50% / 50% 60% 40% 50%;
+            background: radial-gradient(circle at 35% 35%, rgba(var(--state-color), 0.9) 0%, rgba(var(--state-color), 0.3) 60%, transparent 80%);
+            box-shadow: 0 0 50px rgba(var(--state-color), 0.4), inset 0 0 25px rgba(255, 255, 255, 0.05);
+            transition: background 0.8s ease, box-shadow 0.8s ease;
+            z-index: 20;
+            animation: morph 8s ease-in-out infinite, breathe 4s ease-in-out infinite;
+        }
+
+        .orb::before {
+            content: '';
+            position: absolute;
+            inset: -25px;
+            border-radius: inherit;
+            background: radial-gradient(circle, rgba(var(--state-color), 0.15) 0%, transparent 70%);
+            filter: blur(16px);
+            z-index: -1;
+            transition: background 0.8s ease;
+        }
+
+        @keyframes morph {
+            0%   { border-radius: 60% 40% 50% 50% / 50% 60% 40% 50%; }
+            25%  { border-radius: 45% 55% 60% 40% / 55% 45% 55% 45%; }
+            50%  { border-radius: 50% 50% 40% 60% / 40% 55% 45% 55%; }
+            75%  { border-radius: 55% 45% 55% 45% / 60% 40% 50% 50%; }
+            100% { border-radius: 60% 40% 50% 50% / 50% 60% 40% 50%; }
+        }
+
+        @keyframes breathe {
+            0%, 100% { transform: scale(0.97); opacity: 0.85; }
+            50% { transform: scale(1.03); opacity: 1; }
+        }
+
+        .orb.listening {
+            animation: morph 5s ease-in-out infinite, pulse-listen 1.5s ease-in-out infinite;
+        }
+        @keyframes pulse-listen {
+            0%, 100% { transform: scale(1.0); }
+            50% { transform: scale(1.12); }
+        }
+
+        .orb.processing {
+            animation: morph 6s ease-in-out infinite, shimmer 2s linear infinite;
+        }
+        @keyframes shimmer {
+            0% { filter: hue-rotate(0deg); transform: scale(1.0); }
+            50% { filter: hue-rotate(15deg); transform: scale(1.02); }
+            100% { filter: hue-rotate(0deg); transform: scale(1.0); }
+        }
+
+        .orb.speaking {
+            animation: morph 7s ease-in-out infinite, pulse-speak 2s ease-in-out infinite;
+        }
+        @keyframes pulse-speak {
+            0%, 100% { transform: scale(1.0); box-shadow: 0 0 50px rgba(var(--state-color), 0.4); }
+            50% { transform: scale(1.06); box-shadow: 0 0 80px rgba(var(--state-color), 0.6); }
+        }
+
+        canvas {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 10;
+            pointer-events: none;
+        }
+
+        .heading-area { text-align: center; }
+
+        h1 {
+            font-weight: 300;
+            font-size: 20px;
+            color: var(--text-muted);
+            letter-spacing: 0.5px;
+        }
+
+        h2 {
+            font-weight: 600;
+            font-size: 28px;
+            background: linear-gradient(135deg, #fff 0%, rgba(var(--state-color), 0.7) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            transition: background 1s ease;
+        }
+
+        .status-line {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            margin-top: 4px;
+            height: 18px;
+        }
+
+        #status-text {
+            font-size: 11px;
+            color: rgba(var(--state-color), 0.8);
+            letter-spacing: 1.5px;
+            text-transform: uppercase;
+            transition: color 0.8s ease;
+        }
+
+        .status-dots { display: none; gap: 3px; }
+        .status-dots.active { display: flex; }
+        .status-dots span {
+            width: 3px; height: 3px; border-radius: 50%;
+            background: rgba(var(--state-color), 0.7);
+            animation: bounce-dot 1.4s ease-in-out infinite;
+        }
+        .status-dots span:nth-child(2) { animation-delay: 0.15s; }
+        .status-dots span:nth-child(3) { animation-delay: 0.3s; }
+
+        @keyframes bounce-dot {
+            0%, 80%, 100% { transform: translateY(0); opacity: 0.4; }
+            40% { transform: translateY(-4px); opacity: 1; }
+        }
+
+        /* --- CHAT --- */
+        .chat-section {
+            position: relative;
+            z-index: 10;
+            flex: 1;
+            width: 100%;
+            max-width: 540px;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            margin-top: 8px;
+            padding: 0 16px;
+        }
+
+        .chat-scroll {
+            flex: 1;
+            overflow-y: auto;
+            padding: 12px 0 20px;
+            mask-image: linear-gradient(to bottom, transparent 0%, black 3%, black 100%);
+            -webkit-mask-image: linear-gradient(to bottom, transparent 0%, black 3%, black 100%);
+            scroll-behavior: smooth;
+        }
+
+        .chat-scroll::-webkit-scrollbar { width: 3px; }
+        .chat-scroll::-webkit-scrollbar-track { background: transparent; }
+        .chat-scroll::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 2px; }
+
+        #chat-messages { display: flex; flex-direction: column; gap: 10px; }
+
+        .empty-state {
+            display: flex; align-items: center; justify-content: center;
+            height: 100%; color: rgba(255,255,255,0.12);
+            font-size: 13px; font-style: italic; letter-spacing: 0.5px;
+        }
+
+        .message {
+            max-width: 88%; opacity: 0; transform: translateY(12px);
+            animation: slide-in 0.3s ease-out forwards;
+        }
+
+        @keyframes slide-in { to { opacity: 1; transform: translateY(0); } }
+
+        .message.agent { align-self: flex-start; }
+        .message.user { align-self: flex-end; }
+
+        .message .speaker {
+            font-size: 9px; color: var(--text-muted);
+            text-transform: uppercase; letter-spacing: 1px;
+            margin-bottom: 3px; padding: 0 4px;
+        }
+        .message.user .speaker { text-align: right; }
+
+        .message .bubble {
+            padding: 10px 14px; border-radius: 14px;
+            font-size: 13px; line-height: 1.55;
+            word-wrap: break-word; white-space: pre-wrap;
+        }
+
+        .message.agent .bubble {
+            background: var(--glass); border: 1px solid var(--glass-border);
+            border-radius: 4px 14px 14px 14px;
+            backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+            color: rgba(255,255,255,0.85);
+        }
+
+        .message.user .bubble {
+            background: rgba(var(--state-color), 0.1);
+            border: 1px solid rgba(var(--state-color), 0.15);
+            border-radius: 14px 4px 14px 14px;
+            color: rgba(255,255,255,0.9);
+        }
+
+        .typing-cursor::after {
+            content: '|'; animation: blink-cursor 0.7s step-end infinite;
+            color: rgba(var(--state-color), 0.8); font-weight: 300; margin-left: 1px;
+        }
+        @keyframes blink-cursor { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
+
+        /* --- RIGHT PANEL: Music (overlaid, slides in from right) --- */
+        .music-panel {
+            position: absolute;
+            top: 0;
+            right: 0;
+            bottom: 0;
+            width: var(--music-width);
+            z-index: 20;
+            display: flex;
+            flex-direction: column;
+            border-left: 1px solid var(--glass-border);
+            background: rgba(10, 10, 14, 0.97);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            transform: translateX(100%);
+            transition: transform 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .music-panel.active {
+            transform: translateX(0);
+        }
+
+        /* --- ALBUM ART --- */
+        .music-art-container {
+            width: var(--music-width);
+            aspect-ratio: 1;
+            flex-shrink: 0;
+            position: relative;
+            overflow: hidden;
+            background: rgba(var(--music-accent), 0.04);
+            border-bottom: 1px solid var(--glass-border);
+        }
+
+        .music-art-container img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: none;
+        }
+
+        .music-art-container img.loaded {
+            display: block;
+        }
+
+        .music-eq-overlay {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            display: flex;
+            align-items: flex-end;
+            justify-content: center;
+            gap: 3px;
+            padding: 0 0 16px;
+        }
+
+        .music-art-container img.loaded ~ .music-eq-overlay {
+            background: linear-gradient(to top, rgba(0,0,0,0.55) 0%, transparent 100%);
+            padding-bottom: 14px;
+        }
+
+        /* When no album art, center the eq bars */
+        .music-eq-overlay {
+            height: 100%;
+            align-items: center;
+            padding-bottom: 0;
+        }
+        .music-art-container img.loaded ~ .music-eq-overlay {
+            height: auto;
+            align-items: flex-end;
+        }
+
+        .music-eq-overlay span {
+            width: 4px;
+            border-radius: 2px;
+            background: rgba(var(--music-accent), 0.6);
+            animation: eq-bar 1.2s ease-in-out infinite;
+        }
+
+        .music-art-container img.loaded ~ .music-eq-overlay span {
+            background: rgba(255, 255, 255, 0.9);
+        }
+
+        .music-eq-overlay span:nth-child(1) { height: 10px; animation-delay: 0s; }
+        .music-eq-overlay span:nth-child(2) { height: 22px; animation-delay: 0.15s; }
+        .music-eq-overlay span:nth-child(3) { height: 16px; animation-delay: 0.3s; }
+        .music-eq-overlay span:nth-child(4) { height: 26px; animation-delay: 0.45s; }
+        .music-eq-overlay span:nth-child(5) { height: 12px; animation-delay: 0.6s; }
+
+        @keyframes eq-bar {
+            0%, 100% { height: 4px; }
+            50% { height: 28px; }
+        }
+
+        /* --- TRACK INFO --- */
+        .music-header {
+            width: var(--music-width);
+            padding: 16px 20px;
+            flex-shrink: 0;
+        }
+
+        .music-header-label {
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            color: rgba(var(--music-accent), 0.6);
+            margin-bottom: 8px;
+        }
+
+        .music-track {
+            font-size: 18px;
+            font-weight: 600;
+            color: rgba(255, 255, 255, 0.95);
+            line-height: 1.3;
+            word-wrap: break-word;
+        }
+
+        .music-artist {
+            font-size: 13px;
+            color: var(--text-muted);
+            margin-top: 4px;
+            line-height: 1.4;
+        }
+
+        /* --- CONTROLS BAR --- */
+        .controls-bar {
+            position: relative; z-index: 10;
+            display: flex; align-items: center; justify-content: center;
+            gap: 16px;
+            padding: 12px 24px max(20px, env(safe-area-inset-bottom));
+            border-top: 1px solid var(--glass-border);
+            background: rgba(255,255,255,0.01);
+            flex-shrink: 0;
+        }
+
+        .vehicle-chips {
+            display: flex; gap: 10px; align-items: center;
+            position: absolute; left: 24px;
+        }
+
+        .vehicle-chip {
+            display: flex; align-items: center; gap: 6px;
+            padding: 6px 12px; border-radius: 20px;
+            background: var(--glass); border: 1px solid var(--glass-border);
+            font-size: 12px; color: rgba(255,255,255,0.5);
+        }
+
+        .vehicle-chip svg {
+            width: 14px; height: 14px; fill: none;
+            stroke: rgba(255,255,255,0.4); stroke-width: 1.5;
+            stroke-linecap: round; stroke-linejoin: round; flex-shrink: 0;
+        }
+
+        .vehicle-chip .chip-value { color: rgba(255,255,255,0.8); font-weight: 500; }
+
+        #btn-talk {
+            display: flex; align-items: center; gap: 8px;
+            padding: 12px 28px; border-radius: 24px;
+            border: 1px solid var(--glass-border); background: var(--glass);
+            color: rgba(255,255,255,0.85); font-size: 14px; font-weight: 500;
+            cursor: pointer; backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+            transition: all 0.2s ease; letter-spacing: 0.3px;
+            user-select: none; -webkit-user-select: none;
+        }
+        #btn-talk svg {
+            width: 16px; height: 16px; fill: none;
+            stroke: rgba(255,255,255,0.7); stroke-width: 1.8;
+            stroke-linecap: round; stroke-linejoin: round; flex-shrink: 0;
+        }
+        #btn-talk:hover { background: rgba(255,255,255,0.08); transform: translateY(-1px); box-shadow: 0 4px 20px rgba(0,0,0,0.3); }
+        #btn-talk:active { transform: scale(0.97); }
+        #btn-talk:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+
+        #btn-stop {
+            width: 42px; height: 42px; border-radius: 50%;
+            border: 1px solid rgba(255,80,80,0.25); background: rgba(255,50,50,0.12);
+            color: #ff8888; cursor: pointer; display: none;
+            align-items: center; justify-content: center;
+            backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+            transition: all 0.2s ease;
+        }
+        #btn-stop svg { width: 14px; height: 14px; fill: #ff9999; }
+        #btn-stop:hover { background: rgba(255,50,50,0.25); transform: translateY(-1px); }
+        #btn-stop:active { transform: scale(0.95); }
+
+        #btn-clear {
+            width: 42px; height: 42px; border-radius: 50%;
+            border: 1px solid var(--glass-border); background: var(--glass);
+            color: rgba(255,255,255,0.5); cursor: pointer;
+            display: flex; align-items: center; justify-content: center;
+            backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+            transition: all 0.2s ease;
+        }
+        #btn-clear svg {
+            width: 15px; height: 15px; fill: none;
+            stroke: rgba(255,255,255,0.4); stroke-width: 1.8;
+            stroke-linecap: round; stroke-linejoin: round;
+        }
+        #btn-clear:hover { background: rgba(255,255,255,0.08); transform: translateY(-1px); }
+        #btn-clear:hover svg { stroke: rgba(255,255,255,0.7); }
+        #btn-clear:active { transform: scale(0.95); }
+
+        /* --- CLIMATE WIDGET --- */
+        .right-chips {
+            display: flex; gap: 10px; align-items: center;
+            position: absolute; right: 24px;
+        }
+
+        .climate-widget {
+            display: none; align-items: center; gap: 8px;
+            padding: 6px 12px; border-radius: 20px;
+            background: var(--glass); border: 1px solid var(--glass-border);
+            font-size: 12px; color: rgba(255,255,255,0.5);
+        }
+        .climate-widget.active { display: flex; }
+
+        .climate-mode-icon {
+            width: 14px; height: 14px; flex-shrink: 0;
+        }
+        .climate-mode-icon svg {
+            width: 14px; height: 14px; fill: none;
+            stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round;
+        }
+        .climate-mode-icon.cool svg { stroke: rgba(100, 180, 255, 0.8); }
+        .climate-mode-icon.heat svg { stroke: rgba(255, 150, 70, 0.8); }
+        .climate-mode-icon.auto svg { stroke: rgba(160, 220, 140, 0.8); }
+
+        .climate-temp {
+            font-size: 13px; font-weight: 500;
+            color: rgba(255,255,255,0.85);
+            font-variant-numeric: tabular-nums;
+        }
+
+        .climate-fan {
+            display: flex; align-items: flex-end; gap: 1.5px; height: 12px;
+        }
+        .climate-fan span {
+            width: 2.5px; border-radius: 1px;
+            background: rgba(255,255,255,0.15);
+            transition: background 0.3s ease;
+        }
+        .climate-fan span:nth-child(1) { height: 4px; }
+        .climate-fan span:nth-child(2) { height: 6px; }
+        .climate-fan span:nth-child(3) { height: 8px; }
+        .climate-fan span:nth-child(4) { height: 10px; }
+        .climate-fan span:nth-child(5) { height: 12px; }
+        .climate-fan span.on { background: rgba(255,255,255,0.6); }
+
+        .clock-area {
+            font-size: 13px; color: rgba(255,255,255,0.4);
+            font-weight: 400; font-variant-numeric: tabular-nums;
+        }
+
+        /* --- VOICE SELECTOR --- */
+        .voice-selector {
+            display: flex; align-items: center; gap: 6px;
+            padding: 6px 12px; border-radius: 20px;
+            background: var(--glass); border: 1px solid var(--glass-border);
+        }
+        .voice-selector svg {
+            width: 13px; height: 13px; fill: none;
+            stroke: rgba(255,255,255,0.4); stroke-width: 1.5;
+            stroke-linecap: round; stroke-linejoin: round; flex-shrink: 0;
+        }
+        .voice-selector select {
+            background: transparent; border: none; outline: none;
+            color: rgba(255,255,255,0.7); font-size: 11px;
+            font-family: inherit; cursor: pointer;
+            -webkit-appearance: none; appearance: none;
+            padding-right: 12px;
+            max-width: 180px;
+        }
+        .voice-selector select option {
+            background: #1a1a24; color: rgba(255,255,255,0.85);
+        }
+        .voice-selector::after {
+            content: '';
+            position: absolute; right: 10px; top: 50%;
+            transform: translateY(-50%);
+            border-left: 3px solid transparent;
+            border-right: 3px solid transparent;
+            border-top: 4px solid rgba(255,255,255,0.3);
+            pointer-events: none;
+        }
+    </style>
+</head>
+
+<body>
+    <!-- Film grain -->
+    <div class="grain">
+        <svg><filter id="grain-filter"><feTurbulence type="fractalNoise" baseFrequency="0.65" numOctaves="3" stitchTiles="stitch"/></filter><rect width="100%" height="100%" filter="url(#grain-filter)"/></svg>
+    </div>
+
+    <!-- Vignette -->
+    <div class="vignette"></div>
+
+    <!-- Dashboard layout -->
+    <div class="dashboard">
+        <!-- LEFT: Navigation Panel (hidden by default) -->
+        <div class="nav-panel" id="nav-panel">
+            <button class="panel-collapse" id="nav-collapse" title="Collapse navigation">
+                <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
+            </button>
+            <!-- Map -->
+            <div class="nav-map-container">
+                <div id="nav-map"></div>
+            </div>
+
+            <div class="nav-header">
+                <div class="nav-header-label">Navigation</div>
+                <div class="nav-route-summary" id="nav-route-summary">
+                    <span class="nav-duration" id="nav-duration">--</span>
+                    <span class="nav-distance" id="nav-distance"></span>
+                </div>
+                <div class="nav-destination" id="nav-destination"></div>
+            </div>
+
+            <!-- Current instruction -->
+            <div class="nav-current" id="nav-current">
+                <div class="nav-current-label">Next</div>
+                <div class="nav-current-instruction" id="nav-current-instruction"></div>
+                <div class="nav-current-detail" id="nav-current-detail"></div>
+            </div>
+
+            <!-- Step list -->
+            <div class="nav-steps" id="nav-steps"></div>
+        </div>
+
+        <!-- CENTER: Voice Assistant -->
+        <div class="assistant-panel">
+            <div class="ambient-glow" id="ambient-glow"></div>
+
+            <div class="top-section">
+                <div class="orb-wrapper">
+                    <canvas id="waveCanvas"></canvas>
+                    <div class="orb" id="orb"></div>
+                </div>
+
+                <div class="heading-area">
+                    <h1>Edge AI</h1>
+                    <h2>How can I help?</h2>
+                </div>
+
+                <div class="status-line">
+                    <span id="status-text"></span>
+                    <div class="status-dots" id="status-dots">
+                        <span></span><span></span><span></span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="chat-section">
+                <div class="chat-scroll" id="chat-scroll">
+                    <div id="chat-messages"></div>
+                    <div class="empty-state" id="empty-state">Your conversation will appear here</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- RIGHT: Music Panel (hidden by default, slides in) -->
+        <div class="music-panel" id="music-panel">
+            <button class="panel-collapse" id="music-collapse" title="Collapse music">
+                <svg viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg>
+            </button>
+            <div class="music-art-container">
+                <img id="music-art" alt="">
+                <div class="music-eq-overlay">
+                    <span></span><span></span><span></span><span></span><span></span>
+                </div>
+            </div>
+            <div class="music-header">
+                <div class="music-header-label">Now Playing</div>
+                <div class="music-track" id="music-track"></div>
+                <div class="music-artist" id="music-artist"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bottom bar -->
+    <div class="controls-bar">
+        <div class="vehicle-chips">
+            <div class="vehicle-chip" id="chip-temp">
+                <svg viewBox="0 0 24 24"><path d="M14 14.76V3.5a2.5 2.5 0 0 0-5 0v11.26a4.5 4.5 0 1 0 5 0z"/></svg>
+                <span class="chip-value" id="chip-temp-value">72</span>&deg;F
+            </div>
+            <div class="vehicle-chip" id="chip-location">
+                <svg viewBox="0 0 24 24"><circle cx="12" cy="10" r="3"/><path d="M12 2a8 8 0 0 0-8 8c0 5.4 7 11.5 7.3 11.8a1 1 0 0 0 1.4 0C13 21.5 20 15.4 20 10a8 8 0 0 0-8-8z"/></svg>
+                <span class="chip-value" id="chip-location-value">San Francisco, CA</span>
+            </div>
+            <div class="voice-selector" id="voice-selector" style="display:none">
+                <svg viewBox="0 0 24 24"><path d="M12 1a4 4 0 0 0-4 4v6a4 4 0 0 0 8 0V5a4 4 0 0 0-4-4z"/><path d="M19 10v1a7 7 0 0 1-14 0v-1"/></svg>
+                <select id="voice-select"></select>
+            </div>
+        </div>
+
+        <button id="btn-talk" onmousedown="triggerListen()">
+            <svg viewBox="0 0 24 24"><path d="M12 1a4 4 0 0 0-4 4v6a4 4 0 0 0 8 0V5a4 4 0 0 0-4-4z"/><path d="M19 10v1a7 7 0 0 1-14 0v-1"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+            <span id="btn-talk-label">Push to Talk</span>
+        </button>
+        <button id="btn-stop" onmousedown="triggerStop()" title="Stop">
+            <svg viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2" ry="2"></rect></svg>
+        </button>
+        <button id="btn-clear" onmousedown="triggerClear()" title="Clear conversation">
+            <svg viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
+        </button>
+
+        <div class="right-chips">
+            <div class="climate-widget" id="climate-widget">
+                <div class="climate-mode-icon auto" id="climate-mode-icon">
+                    <svg id="climate-icon-auto" viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-9-9"/><polyline points="21 3 21 9 15 9"/></svg>
+                    <svg id="climate-icon-cool" viewBox="0 0 24 24" style="display:none"><line x1="12" y1="2" x2="12" y2="22"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/><line x1="19.07" y1="4.93" x2="4.93" y2="19.07"/></svg>
+                    <svg id="climate-icon-heat" viewBox="0 0 24 24" style="display:none"><path d="M12 2c0 4-4 6-4 10a4 4 0 0 0 8 0c0-4-4-6-4-10z"/><circle cx="12" cy="16" r="1"/></svg>
+                </div>
+                <span class="climate-temp" id="climate-temp">72&deg;</span>
+                <div class="climate-fan" id="climate-fan">
+                    <span></span><span></span><span></span><span></span><span></span>
+                </div>
+            </div>
+            <div class="clock-area" id="clock"></div>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+    // --- API ---
+    function triggerListen() { fetch('/api/trigger', { method: 'POST' }).catch(console.error); }
+    function triggerStop() { fetch('/api/stop', { method: 'POST' }).catch(console.error); }
+    function triggerClear() {
+        fetch('/api/clear', { method: 'POST' }).catch(console.error);
+        // Clear local chat UI
+        const msgs = document.getElementById('chat-messages');
+        if (msgs) msgs.innerHTML = '';
+        const empty = document.getElementById('empty-state');
+        if (empty) empty.style.display = 'flex';
+        renderedCount = 0;
+        lastRawTranscript = '';
+    }
+
+    // --- STATE ---
+    const STATE = { IDLE: '0', LISTENING: '1', PROCESSING: '2', SPEAKING: '3' };
+    let currentState = STATE.IDLE;
+    let renderedCount = 0;
+    let lastRawTranscript = '';
+    let lastNavJson = '';
+    let lastMusicText = '';
+
+    const stateColors = {
+        [STATE.IDLE]:       [130, 100, 255],
+        [STATE.LISTENING]:  [255, 70, 70],
+        [STATE.PROCESSING]: [245, 190, 60],
+        [STATE.SPEAKING]:   [70, 140, 255],
+    };
+
+    const stateLabels = {
+        [STATE.IDLE]: '',
+        [STATE.LISTENING]: 'Listening',
+        [STATE.PROCESSING]: 'Thinking',
+        [STATE.SPEAKING]: 'Speaking',
+    };
+
+    // --- ELEMENTS ---
+    const orb = document.getElementById('orb');
+    const ambientGlow = document.getElementById('ambient-glow');
+    const statusText = document.getElementById('status-text');
+    const statusDots = document.getElementById('status-dots');
+    const chatMessages = document.getElementById('chat-messages');
+    const chatScroll = document.getElementById('chat-scroll');
+    const emptyState = document.getElementById('empty-state');
+    const btnTalk = document.getElementById('btn-talk');
+    const btnTalkLabel = document.getElementById('btn-talk-label');
+    const btnStop = document.getElementById('btn-stop');
+
+    const musicPanel = document.getElementById('music-panel');
+    const musicTrack = document.getElementById('music-track');
+    const musicArtist = document.getElementById('music-artist');
+    const musicArt = document.getElementById('music-art');
+    let artworkCache = {};  // { "artist - album": url }
+
+    const climateWidget = document.getElementById('climate-widget');
+    const climateTemp = document.getElementById('climate-temp');
+    const climateFan = document.getElementById('climate-fan');
+    const climateModeIcon = document.getElementById('climate-mode-icon');
+
+    // Panel collapse state (prevents polling from reopening manually collapsed panels)
+    let navCollapsed = false;
+    let musicCollapsed = false;
+
+    document.getElementById('nav-collapse').addEventListener('click', () => {
+        navCollapsed = true;
+        navPanel.classList.remove('active');
+    });
+
+    document.getElementById('music-collapse').addEventListener('click', () => {
+        musicCollapsed = true;
+        musicPanel.classList.remove('active');
+    });
+
+    const navPanel = document.getElementById('nav-panel');
+    const navRouteSummary = document.getElementById('nav-route-summary');
+    const navDuration = document.getElementById('nav-duration');
+    const navDistance = document.getElementById('nav-distance');
+    const navDestination = document.getElementById('nav-destination');
+    const navCurrent = document.getElementById('nav-current');
+    const navCurrentInstruction = document.getElementById('nav-current-instruction');
+    const navCurrentDetail = document.getElementById('nav-current-detail');
+    const navSteps = document.getElementById('nav-steps');
+
+    // --- CLOCK ---
+    function updateClock() {
+        const now = new Date();
+        const h = now.getHours();
+        const m = String(now.getMinutes()).padStart(2, '0');
+        const ampm = h >= 12 ? 'PM' : 'AM';
+        document.getElementById('clock').textContent = `${h % 12 || 12}:${m} ${ampm}`;
+    }
+    updateClock();
+    setInterval(updateClock, 10000);
+
+    // --- MAP (Leaflet, initialized lazily) ---
+    let map = null;
+    let routeLayer = null;
+    let markersLayer = null;
+
+    function initMap() {
+        if (map) return;
+        map = L.map('nav-map', {
+            zoomControl: true,
+            attributionControl: false,
+            dragging: true,
+            scrollWheelZoom: true,
+        }).setView([37.7749, -122.4194], 12);
+
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+            maxZoom: 19,
+            subdomains: 'abcd',
+        }).addTo(map);
+
+        routeLayer = L.layerGroup().addTo(map);
+        markersLayer = L.layerGroup().addTo(map);
+    }
+
+    // Decode Google encoded polyline
+    function decodePolyline(encoded) {
+        const points = [];
+        let index = 0, lat = 0, lng = 0;
+        while (index < encoded.length) {
+            let b, shift = 0, result = 0;
+            do {
+                b = encoded.charCodeAt(index++) - 63;
+                result |= (b & 0x1f) << shift;
+                shift += 5;
+            } while (b >= 0x20);
+            lat += (result & 1) ? ~(result >> 1) : (result >> 1);
+
+            shift = 0; result = 0;
+            do {
+                b = encoded.charCodeAt(index++) - 63;
+                result |= (b & 0x1f) << shift;
+                shift += 5;
+            } while (b >= 0x20);
+            lng += (result & 1) ? ~(result >> 1) : (result >> 1);
+
+            points.push([lat / 1e5, lng / 1e5]);
+        }
+        return points;
+    }
+
+    function renderRouteOnMap(data) {
+        initMap();
+        routeLayer.clearLayers();
+        markersLayer.clearLayers();
+
+        const route = data.routes[0];
+        if (!route) return;
+
+        // Draw polyline from overview_polyline
+        if (route.overview_polyline && route.overview_polyline.points) {
+            const coords = decodePolyline(route.overview_polyline.points);
+            L.polyline(coords, {
+                color: 'rgb(100, 220, 160)',
+                weight: 4,
+                opacity: 0.85,
+                smoothFactor: 1,
+            }).addTo(routeLayer);
+        }
+
+        // Start and end markers
+        const leg = route.legs && route.legs[0];
+        if (leg) {
+            if (leg.start_location) {
+                L.circleMarker([leg.start_location.lat, leg.start_location.lng], {
+                    radius: 7, color: '#fff', fillColor: 'rgb(100, 220, 160)',
+                    fillOpacity: 1, weight: 2,
+                }).addTo(markersLayer);
+            }
+            if (leg.end_location) {
+                L.circleMarker([leg.end_location.lat, leg.end_location.lng], {
+                    radius: 7, color: '#fff', fillColor: '#ff6666',
+                    fillOpacity: 1, weight: 2,
+                }).addTo(markersLayer);
+            }
+        }
+
+        // Fit bounds
+        if (route.bounds) {
+            const sw = route.bounds.southwest;
+            const ne = route.bounds.northeast;
+            map.fitBounds([[sw.lat, sw.lng], [ne.lat, ne.lng]], { padding: [30, 30] });
+        }
+    }
+
+    // --- UPDATE STATE VISUALS ---
+    function applyState(state) {
+        if (state === currentState) return;
+        currentState = state;
+
+        const color = stateColors[state] || stateColors[STATE.IDLE];
+        const colorStr = color.join(', ');
+        document.documentElement.style.setProperty('--state-color', colorStr);
+        document.documentElement.style.setProperty('--state-glow', `rgba(${colorStr}, 0.3)`);
+        ambientGlow.style.background = `radial-gradient(circle, rgba(${colorStr}, 0.10) 0%, transparent 70%)`;
+
+        orb.className = 'orb';
+        if (state === STATE.LISTENING) orb.classList.add('listening');
+        else if (state === STATE.PROCESSING) orb.classList.add('processing');
+        else if (state === STATE.SPEAKING) orb.classList.add('speaking');
+
+        statusText.textContent = stateLabels[state] || '';
+        statusDots.classList.toggle('active', state !== STATE.IDLE);
+
+        if (state === STATE.IDLE) {
+            btnStop.style.display = 'none';
+            btnTalk.disabled = false;
+            btnTalkLabel.textContent = 'Push to Talk';
+        } else {
+            btnStop.style.display = 'flex';
+            btnTalkLabel.textContent = 'Interrupt';
+        }
+    }
+
+    // --- NAVIGATION RENDERING ---
+    function stripHtmlTags(html) {
+        const tmp = document.createElement('div');
+        tmp.innerHTML = html;
+        return tmp.textContent || tmp.innerText || '';
+    }
+
+    function renderNavigation(data) {
+        if (!data || !data.routes || data.routes.length === 0) return;
+
+        const route = data.routes[0];
+        if (!route.legs || route.legs.length === 0) return;
+        const leg = route.legs[0];
+
+        // Slide nav panel in (unless manually collapsed)
+        if (!navCollapsed) {
+            navPanel.classList.add('active');
+        }
+
+        // Render map route
+        renderRouteOnMap(data);
+
+        // After panel transition completes, invalidate map size so tiles render correctly
+        setTimeout(() => { if (map) map.invalidateSize(); }, 550);
+
+        // Route summary
+        navRouteSummary.classList.add('active');
+        navDuration.textContent = leg.duration ? leg.duration.text : '--';
+        navDistance.textContent = leg.distance ? leg.distance.text : '';
+        navDestination.textContent = leg.end_address || '';
+
+        // Steps
+        const steps = leg.steps || [];
+        if (steps.length === 0) return;
+
+        // Current instruction hero
+        navCurrent.classList.add('active');
+        navCurrentInstruction.textContent = stripHtmlTags(steps[0].html_instructions || '');
+        const d = steps[0].distance ? steps[0].distance.text : '';
+        const t = steps[0].duration ? steps[0].duration.text : '';
+        navCurrentDetail.textContent = [d, t].filter(Boolean).join(' \u00B7 ');
+
+        // Step list
+        let html = '';
+        for (let i = 0; i < steps.length; i++) {
+            const step = steps[i];
+            const instr = stripHtmlTags(step.html_instructions || '');
+            const dist = step.distance ? step.distance.text : '';
+            const dur = step.duration ? step.duration.text : '';
+            const meta = [dist, dur].filter(Boolean).join(' \u00B7 ');
+            const cls = i === 0 ? ' current-step' : '';
+
+            html += `<div class="nav-step${cls}">
+                <div class="nav-step-num">${i + 1}</div>
+                <div class="nav-step-body">
+                    <div class="nav-step-instruction">${instr}</div>
+                    ${meta ? `<div class="nav-step-meta">${meta}</div>` : ''}
+                </div>
+            </div>`;
+        }
+
+        // Destination marker
+        html += `<div class="nav-step nav-step-destination">
+            <div class="nav-step-num">
+                <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="10" r="3"/><path d="M12 2a8 8 0 0 0-8 8c0 5.4 7 11.5 7.3 11.8a1 1 0 0 0 1.4 0C13 21.5 20 15.4 20 10a8 8 0 0 0-8-8z"/></svg>
+            </div>
+            <div class="nav-step-body">
+                <div class="nav-step-instruction" style="color: rgba(var(--nav-active), 0.9);">Arrive at destination</div>
+                <div class="nav-step-meta">${leg.end_address || ''}</div>
+            </div>
+        </div>`;
+
+        navSteps.innerHTML = html;
+    }
+
+    // --- PARSE TRANSCRIPT ---
+    function parseMessages(raw) {
+        if (!raw || !raw.trim()) return [];
+        const blocks = raw.split('\n\n').filter(b => b.trim());
+        const messages = [];
+        for (const block of blocks) {
+            const colonIdx = block.indexOf(':');
+            if (colonIdx === -1) continue;
+            const role = block.substring(0, colonIdx).trim();
+            const content = block.substring(colonIdx + 1).trim();
+            if (role.toLowerCase() === 'system') continue;
+            messages.push({ role, content });
+        }
+        return messages;
+    }
+
+    // --- RENDER CHAT ---
+    function renderChat(raw, isStreaming) {
+        const messages = parseMessages(raw);
+        if (messages.length === 0) { emptyState.style.display = 'flex'; return; }
+        emptyState.style.display = 'none';
+
+        for (let i = 0; i < messages.length; i++) {
+            const msg = messages[i];
+            const isAgent = msg.role.toLowerCase() !== 'user';
+            const isLast = i === messages.length - 1;
+            const showCursor = isStreaming && isLast && isAgent;
+
+            if (i < renderedCount) {
+                if (isLast) {
+                    const el = chatMessages.children[i];
+                    if (el) {
+                        const bubble = el.querySelector('.bubble');
+                        if (bubble) {
+                            bubble.textContent = msg.content;
+                            bubble.classList.toggle('typing-cursor', showCursor);
+                        }
+                    }
+                }
+            } else {
+                const wrapper = document.createElement('div');
+                wrapper.className = 'message ' + (isAgent ? 'agent' : 'user');
+
+                const speaker = document.createElement('div');
+                speaker.className = 'speaker';
+                speaker.textContent = msg.role;
+
+                const bubble = document.createElement('div');
+                bubble.className = 'bubble' + (showCursor ? ' typing-cursor' : '');
+                bubble.textContent = msg.content;
+
+                wrapper.appendChild(speaker);
+                wrapper.appendChild(bubble);
+                chatMessages.appendChild(wrapper);
+            }
+        }
+
+        if (messages.length < renderedCount) {
+            chatMessages.innerHTML = '';
+            renderedCount = 0;
+            renderChat(raw, isStreaming);
+            return;
+        }
+
+        renderedCount = messages.length;
+
+        chatMessages.querySelectorAll('.typing-cursor').forEach(b => {
+            if (b.closest('.message') !== chatMessages.lastElementChild) {
+                b.classList.remove('typing-cursor');
+            }
+        });
+
+        chatScroll.scrollTop = chatScroll.scrollHeight;
+    }
+
+    // --- CANVAS: WAVES + PARTICLES ---
+    const canvas = document.getElementById('waveCanvas');
+    const ctx = canvas.getContext('2d');
+
+    const canvasSize = 280;
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = canvasSize * dpr;
+    canvas.height = canvasSize * dpr;
+    canvas.style.width = `${canvasSize}px`;
+    canvas.style.height = `${canvasSize}px`;
+    ctx.scale(dpr, dpr);
+
+    let time = 0;
+    let targetAmplitude = 5;
+    let currentAmplitude = 5;
+    let targetColor = stateColors[STATE.IDLE];
+    let currentColor = [...targetColor];
+
+    const stateAmplitudes = {
+        [STATE.IDLE]: 4, [STATE.LISTENING]: 20,
+        [STATE.PROCESSING]: 12, [STATE.SPEAKING]: 35,
+    };
+
+    const PARTICLE_COUNT = 30;
+    const particles = [];
+    for (let i = 0; i < PARTICLE_COUNT; i++) {
+        particles.push({
+            angle: Math.random() * Math.PI * 2,
+            radius: 45 + Math.random() * 40,
+            speed: 0.002 + Math.random() * 0.004,
+            size: 0.8 + Math.random() * 1.5,
+            opacity: Math.random(),
+            fadeSpeed: 0.005 + Math.random() * 0.01,
+            fadeDir: 1,
+        });
+    }
+
+    function lerpColor(a, b, t) {
+        return [a[0]+(b[0]-a[0])*t, a[1]+(b[1]-a[1])*t, a[2]+(b[2]-a[2])*t];
+    }
+
+    function drawWave(peaks, speed, phaseOffset, alpha, radiusOffset) {
+        const cx = canvasSize/2, cy = canvasSize/2, baseR = 70 + radiusOffset;
+        const r = Math.round(currentColor[0]);
+        const g = Math.round(currentColor[1]);
+        const b = Math.round(currentColor[2]);
+
+        ctx.beginPath();
+        ctx.strokeStyle = `rgba(${r},${g},${b},${alpha})`;
+        ctx.lineWidth = 1.2;
+        ctx.shadowBlur = 6;
+        ctx.shadowColor = `rgba(${r},${g},${b},${alpha*0.5})`;
+
+        for (let a = 0; a <= Math.PI*2; a += 0.02) {
+            const noise = Math.sin(a*peaks + time*speed + phaseOffset)
+                        * Math.cos(a*(peaks/2) - time*(speed/2));
+            const rad = baseR + Math.abs(noise)*currentAmplitude;
+            const x = cx + rad*Math.cos(a);
+            const y = cy + rad*Math.sin(a);
+            if (a === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+        }
+        ctx.closePath();
+        ctx.stroke();
+        ctx.shadowBlur = 0;
+    }
+
+    function drawParticles() {
+        const cx = canvasSize/2, cy = canvasSize/2;
+        const r = Math.round(currentColor[0]);
+        const g = Math.round(currentColor[1]);
+        const b = Math.round(currentColor[2]);
+
+        for (const p of particles) {
+            p.angle += p.speed;
+            p.opacity += p.fadeSpeed * p.fadeDir;
+            if (p.opacity >= 1) { p.opacity = 1; p.fadeDir = -1; }
+            if (p.opacity <= 0) { p.opacity = 0; p.fadeDir = 1; }
+
+            const x = cx + (p.radius + currentAmplitude*0.3) * Math.cos(p.angle);
+            const y = cy + (p.radius + currentAmplitude*0.3) * Math.sin(p.angle);
+
+            ctx.beginPath();
+            ctx.arc(x, y, p.size, 0, Math.PI*2);
+            ctx.fillStyle = `rgba(${r},${g},${b},${p.opacity*0.4})`;
+            ctx.fill();
+        }
+    }
+
+    function animate() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        time += 0.025;
+        currentAmplitude += (targetAmplitude - currentAmplitude) * 0.06;
+        currentColor = lerpColor(currentColor, targetColor, 0.04);
+
+        drawWave(6, 1.5, 0, 0.45, 0);
+        drawWave(4, 1.0, 2, 0.3, 4);
+        drawWave(3, 0.7, 4, 0.18, 8);
+        drawWave(5, 1.2, 6, 0.10, 12);
+        drawParticles();
+        requestAnimationFrame(animate);
+    }
+    animate();
+
+    // --- POLLING: transcript ---
+    let pollInterval = 300;
+    let pollTimer = null;
+
+    function pollTranscript() {
+        fetch('/api/transcript?t=' + Date.now())
+            .then(response => {
+                const state = response.headers.get('X-Voice-Status') || STATE.IDLE;
+                applyState(state);
+                targetAmplitude = stateAmplitudes[state] || 4;
+                targetColor = stateColors[state] || stateColors[STATE.IDLE];
+
+                const newInterval = (state === STATE.PROCESSING || state === STATE.SPEAKING) ? 150 : 300;
+                if (newInterval !== pollInterval) {
+                    pollInterval = newInterval;
+                    clearInterval(pollTimer);
+                    pollTimer = setInterval(pollTranscript, pollInterval);
+                }
+                return response.text();
+            })
+            .then(text => {
+                const isStreaming = currentState === STATE.PROCESSING || currentState === STATE.SPEAKING;
+                if (text !== lastRawTranscript || isStreaming) {
+                    lastRawTranscript = text;
+                    renderChat(text, isStreaming);
+                }
+            })
+            .catch(console.error);
+    }
+
+    pollTimer = setInterval(pollTranscript, pollInterval);
+    pollTranscript();
+
+    // --- POLLING: navigation ---
+    function pollNavigation() {
+        fetch('/api/navigation?t=' + Date.now())
+            .then(r => {
+                if (!r.ok) return null;
+                return r.text();
+            })
+            .then(text => {
+                if (!text || text === lastNavJson) return;
+                lastNavJson = text;
+                navCollapsed = false;  // New route data — reset collapse
+                try {
+                    renderNavigation(JSON.parse(text));
+                } catch (e) { /* ignore */ }
+            })
+            .catch(() => {});
+    }
+
+    setInterval(pollNavigation, 2000);
+    pollNavigation();
+
+    // --- ALBUM ART (via iTunes Search API) ---
+    function fetchAlbumArt(track, artist, album) {
+        const key = (artist + ' ' + (album || track)).trim().toLowerCase();
+        if (!key) return;
+
+        // Check cache
+        if (artworkCache[key] !== undefined) {
+            applyArtwork(artworkCache[key]);
+            return;
+        }
+
+        const query = encodeURIComponent(artist ? (artist + ' ' + (album || track)) : track);
+        fetch('https://itunes.apple.com/search?term=' + query + '&entity=album&limit=1')
+            .then(r => r.json())
+            .then(data => {
+                if (data.results && data.results.length > 0) {
+                    // Get higher-res artwork (replace 100x100 with 300x300)
+                    const url = data.results[0].artworkUrl100.replace('100x100', '300x300');
+                    artworkCache[key] = url;
+                    applyArtwork(url);
+                } else {
+                    artworkCache[key] = null;
+                    applyArtwork(null);
+                }
+            })
+            .catch(() => {
+                artworkCache[key] = null;
+                applyArtwork(null);
+            });
+    }
+
+    function applyArtwork(url) {
+        if (url) {
+            musicArt.src = url;
+            musicArt.onload = () => musicArt.classList.add('loaded');
+            musicArt.onerror = () => musicArt.classList.remove('loaded');
+        } else {
+            musicArt.classList.remove('loaded');
+            musicArt.removeAttribute('src');
+        }
+    }
+
+    // --- POLLING: music ---
+    function pollMusic() {
+        fetch('/api/music?t=' + Date.now())
+            .then(r => {
+                if (r.status === 204 || !r.ok) {
+                    if (lastMusicText) {
+                        lastMusicText = '';
+                        musicCollapsed = false;  // Reset so next track reopens
+                        musicPanel.classList.remove('active');
+                        applyArtwork(null);
+                    }
+                    return null;
+                }
+                return r.text();
+            })
+            .then(text => {
+                if (!text || text === lastMusicText) return;
+                lastMusicText = text;
+
+                // Parse: MCP tool returns "Name: X, Artist: Y, Album: Z" or "X - Y - Z" or plain text
+                let track = text, artist = '', album = '';
+
+                // Try "Name: ..., Artist: ..., Album: ..." format
+                const nameMatch = text.match(/(?:Name|Track):\s*(.+?)(?:,\s*Artist:|$)/i);
+                const artistMatch = text.match(/Artist:\s*(.+?)(?:,\s*Album:|$)/i);
+                const albumMatch = text.match(/Album:\s*(.+?)$/i);
+
+                if (nameMatch) {
+                    track = nameMatch[1].trim();
+                    artist = artistMatch ? artistMatch[1].trim() : '';
+                    album = albumMatch ? albumMatch[1].trim() : '';
+                } else if (text.includes(' - ')) {
+                    // Try "Track - Artist - Album" format
+                    const parts = text.split(' - ').map(s => s.trim());
+                    track = parts[0] || text;
+                    artist = parts[1] || '';
+                    album = parts[2] || '';
+                }
+
+                musicTrack.textContent = track;
+                musicArtist.textContent = [artist, album].filter(Boolean).join(' \u2022 ') || '';
+                if (!musicCollapsed) {
+                    musicPanel.classList.add('active');
+                }
+                fetchAlbumArt(track, artist, album);
+            })
+            .catch(() => {});
+    }
+
+    setInterval(pollMusic, 3000);
+    pollMusic();
+
+    // --- POLLING: climate ---
+    function renderClimate(data) {
+        climateWidget.classList.add('active');
+
+        // Temperature
+        climateTemp.innerHTML = data.temperature + '&deg;';
+
+        // Also update the temp chip on the left
+        document.getElementById('chip-temp-value').textContent = data.temperature;
+
+        // Fan speed bars (1-5)
+        const bars = climateFan.querySelectorAll('span');
+        bars.forEach((bar, i) => {
+            bar.classList.toggle('on', i < data.fan_speed);
+        });
+
+        // Mode icon
+        const mode = (data.mode || 'auto').toLowerCase();
+        document.getElementById('climate-icon-auto').style.display = mode === 'auto' ? '' : 'none';
+        document.getElementById('climate-icon-cool').style.display = mode === 'cool' ? '' : 'none';
+        document.getElementById('climate-icon-heat').style.display = mode === 'heat' ? '' : 'none';
+        climateModeIcon.className = 'climate-mode-icon ' + mode;
+    }
+
+    let lastClimateJson = '';
+    function pollClimate() {
+        fetch('/api/climate?t=' + Date.now())
+            .then(r => {
+                if (r.status === 204 || !r.ok) return null;
+                return r.text();
+            })
+            .then(text => {
+                if (!text || text === lastClimateJson) return;
+                lastClimateJson = text;
+                try { renderClimate(JSON.parse(text)); } catch(e) {}
+            })
+            .catch(() => {});
+    }
+
+    setInterval(pollClimate, 3000);
+    pollClimate();
+
+    // --- VOICE SELECTOR (proxied through backend to avoid CORS) ---
+    const voiceSelector = document.getElementById('voice-selector');
+    const voiceSelect = document.getElementById('voice-select');
+
+    function loadVoices() {
+        fetch('/api/voices')
+            .then(r => r.json())
+            .then(voices => {
+                if (!voices || voices.length === 0) return;
+                voiceSelect.innerHTML = '';
+                voices.sort();
+                for (const v of voices) {
+                    const opt = document.createElement('option');
+                    opt.value = v;
+                    // Format name: "en_US-amy-medium" → "Amy (Medium) — en US"
+                    const parts = v.split('-');
+                    if (parts.length >= 2) {
+                        const name = parts[1].charAt(0).toUpperCase() + parts[1].slice(1);
+                        const quality = parts[2] ? ' (' + parts[2].charAt(0).toUpperCase() + parts[2].slice(1) + ')' : '';
+                        const lang = parts[0].replace('_', ' ');
+                        opt.textContent = name + quality + ' \u2014 ' + lang;
+                    } else {
+                        opt.textContent = v;
+                    }
+                    voiceSelect.appendChild(opt);
+                }
+                // Select hfc_female by default
+                const defaultVoice = voices.find(v => v.toLowerCase().includes('hfc_female'));
+                if (defaultVoice) {
+                    voiceSelect.value = defaultVoice;
+                }
+                voiceSelector.style.display = 'flex';
+            })
+            .catch(() => { /* TTS not available */ });
+    }
+
+    voiceSelect.addEventListener('change', () => {
+        const voice = voiceSelect.value;
+        if (!voice) return;
+        fetch('/api/loadVoice', {
+            method: 'POST',
+            body: voice,
+        }).catch(console.error);
+    });
+
+    loadVoices();
+    </script>
+</body>
+</html>

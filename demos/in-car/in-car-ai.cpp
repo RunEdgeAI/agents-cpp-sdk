@@ -1,21 +1,31 @@
 /**
  * @example in-car-ai.cpp
  * @brief In-Car AI Demo
- * @version 0.1
+ * @version 0.2
  * @date 2025-07-20
  *
  * @copyright Copyright (c) 2025 Edge AI, LLC. All rights reserved.
  */
-#include <agents-cpp/agents/autonomous_agent.h>
+#include <agents-cpp/agents/voice_agent.h>
 #include <agents-cpp/config_loader.h>
 #include <agents-cpp/http_client.h>
 #include <agents-cpp/logger.h>
 #include <agents-cpp/tools/tool_registry.h>
 
+#include <algorithm>
 #include <chrono>
 #include <iostream>
+#include <mutex>
 
 using namespace agents;
+
+// Shared state for navigation data (written by navigate tool, read by UI)
+static std::mutex nav_mutex;
+static std::string nav_json;
+
+// Shared state for AC controls (written by AC tool, read by UI)
+static std::mutex ac_mutex;
+static std::string ac_json;
 
 int main() {
     // Initialize the logger
@@ -35,12 +45,6 @@ int main() {
         Logger::error("Please ensure the appropriate API key is set in the environment.");
         return EXIT_FAILURE;
     }
-
-    // Configure LLM options
-    LLMOptions options;
-    options.temperature = 0.2;
-    options.max_tokens = 1024;
-    llm->setOptions(options);
 
     // Create agent context
     auto context = std::make_shared<Context>();
@@ -65,7 +69,7 @@ int main() {
             {"end_long", "The destination longitude", "number", false},
             {"end_lat", "The destination latitude", "number", false},
         },
-        [context, config](const JsonObject& params) -> ToolResult {
+        [context, &config](const JsonObject& params) -> ToolResult {
             std::string api_key = config.get("MAPS_API_KEY");
             const std::string url = "https://maps.googleapis.com/maps/api/directions/json";
 
@@ -108,7 +112,7 @@ int main() {
             };
 
             HTTPClient::Response resp = HTTPClient::get(url, nav_params, headers);
-            std::string directions;
+            std::string directions = "Directions: ";
 
             // process response
             if (resp.status_code == 200)
@@ -124,6 +128,12 @@ int main() {
                 }
             } else {
                 directions = "Failed to fetch navigation data";
+            }
+
+            // Store navigation data for UI consumption
+            {
+                std::lock_guard<std::mutex> lock(nav_mutex);
+                nav_json = resp.text;
             }
 
             return ToolResult{
@@ -147,10 +157,10 @@ int main() {
 
             // Simulate fetching location
             JsonObject location;
-            location["latitude"] = 37.7749;
-            location["longitude"] = -122.4194;
+            location["latitude"] = 37.8052;
+            location["longitude"] = -122.432091;
             if (address) {
-                location["address"] = "1 Infinite Loop, Cupertino, CA";
+                location["address"] = "2 Marina Blvd, San Francisco, CA";
             }
 
             std::string result = "Current location is (" +
@@ -174,7 +184,7 @@ int main() {
         {
             {"temperature", "The desired temperature setting in fahrenheit", "integer", true},
             {"fan_speed", "The speed of the fan (1-5)", "integer", false},
-            {"mode", "The mode of operation (e.g., cool, heat, auto)", "string", false}
+            {"mode", "The mode of operation: cool, heat, or auto", "string", false}
         },
         [context](const JsonObject& params) -> ToolResult {
             int temperature = params["temperature"];
@@ -184,6 +194,16 @@ int main() {
             std::string result = "Setting air conditioner to " + std::to_string(temperature) +
                                  " degrees, fan speed " + std::to_string(fan_speed) +
                                  ", mode " + mode + ".";
+
+            // Store AC state for UI
+            {
+                std::lock_guard<std::mutex> lock(ac_mutex);
+                JsonObject ac_state;
+                ac_state["temperature"] = temperature;
+                ac_state["fan_speed"] = fan_speed;
+                ac_state["mode"] = mode;
+                ac_json = ac_state.dump();
+            }
 
             return ToolResult{
                 true,
@@ -199,65 +219,222 @@ int main() {
     context->registerTool(navigation_tool);
 
     // Create the agent
-    AutonomousAgent agent(context);
-    agent.setPlanningStrategy(AutonomousAgent::PlanningStrategy::REACT);
+    VoiceAgent::Config cfg;
+    cfg.agent_endpoint = "http://127.0.0.1:8080/agent";
+    cfg.stt_endpoint = "http://127.0.0.1:8888/";
+    cfg.tts_endpoint = "http://127.0.0.1:9999/";
+    cfg.api_key = config.get("EDGEAI_API_KEY");
+
+    VoiceAgent agent(context, cfg);
 
     // Set the agent prompt (this extends the context system prompt for the agent)
-    agent.setAgentPrompt(
-        "You are an advanced autonomous in-car assistant capable of using tools to help users "
-        "accomplish their tasks. You break down complex problems into manageable steps "
-        "and execute them systematically."
-    );
-
-    // Set up options
-    AutonomousAgent::Options agent_options;
-    agent_options.max_iterations = 15;
-    agent.setOptions(agent_options);
+    agent.setAgentPrompt(config.get("SYSTEM_PROMPT"));
 
     // Initialize the agent
     agent.init();
 
+    // Run the in-car UI in a separate thread
+    httplib::Server svr;
+
+    // Shared state for streaming partial responses to UI
+    std::mutex partial_mutex;
+    std::string current_partial;
+
+    // Serve the in-car UI
+    svr.Get("/", [](const httplib::Request&, httplib::Response& res) {
+        std::string html = Utils::loadHtmlFile("sample_media/ui/in-car.html");
+        res.set_content(html, "text/html");
+    });
+
+    // Trigger listen via UI
+    svr.Post("/api/trigger", [&agent](const httplib::Request&, httplib::Response& res) {
+        Logger::info("[Backend] Agent triggered via Web UI!");
+        agent.listen();
+        res.set_content("OK", "text/plain");
+    });
+
+    // Transcript API (chat + voice status)
+    svr.Get("/api/transcript", [&agent, &partial_mutex, &current_partial](const httplib::Request&, httplib::Response& res) {
+        auto state = agent.getState();
+        std::string state_str;
+        switch (state) {
+            case VoiceAgent::State::LISTENING: state_str = "1"; break;
+            case VoiceAgent::State::PROCESSING: state_str = "2"; break;
+            case VoiceAgent::State::SPEAKING: state_str = "3"; break;
+            default: state_str = "0"; break;
+        }
+
+        std::string summary;
+        auto ctx = agent.getContext();
+        if (ctx && ctx->getMemory()) {
+            summary = ctx->getMemory()->getConversationSummary();
+        }
+
+        {
+            std::lock_guard<std::mutex> lock(partial_mutex);
+            if (!current_partial.empty()) {
+                summary += "Assistant: " + current_partial + "\n\n";
+            }
+        }
+
+        res.set_header("X-Voice-Status", state_str);
+        res.set_content(summary, "text/plain");
+    });
+
+    // Navigation data API (polled by UI to display turn-by-turn directions)
+    svr.Get("/api/navigation", [](const httplib::Request&, httplib::Response& res) {
+        std::lock_guard<std::mutex> lock(nav_mutex);
+        if (nav_json.empty()) {
+            res.status = 204;
+            return;
+        }
+        res.set_content(nav_json, "application/json");
+    });
+
+    // Music "now playing" API (calls Apple Music MCP tool directly)
+    svr.Get("/api/music", [&context](const httplib::Request&, httplib::Response& res) {
+        auto tool = context->getTool("itunes_current_song");
+        if (!tool) {
+            res.status = 204;
+            return;
+        }
+        try {
+            auto result = tool->execute({});
+            if (result.success && !result.content.empty()) {
+                // Filter out "nothing playing" responses from Apple Music
+                std::string lower = result.content;
+                std::transform(lower.begin(), lower.end(), lower.begin(), ::tolower);
+                if (lower.find("nothing") != std::string::npos ||
+                    lower.find("not playing") != std::string::npos ||
+                    lower.find("no track") != std::string::npos ||
+                    lower.find("stopped") != std::string::npos ||
+                    lower.find("error") != std::string::npos ||
+                    lower.find("can't get") != std::string::npos) {
+                    res.status = 204;
+                } else {
+                    res.set_content(result.content, "text/plain");
+                }
+            } else {
+                res.status = 204;
+            }
+        } catch (...) {
+            res.status = 204;
+        }
+    });
+
+    // Climate / AC controls API
+    svr.Get("/api/climate", [](const httplib::Request&, httplib::Response& res) {
+        std::lock_guard<std::mutex> lock(ac_mutex);
+        if (ac_json.empty()) {
+            res.status = 204;
+            return;
+        }
+        res.set_content(ac_json, "application/json");
+    });
+
+    // Stop API
+    svr.Post("/api/stop", [&agent](const httplib::Request&, httplib::Response& res) {
+        Logger::info("[Backend] Stop requested via Web UI!");
+        agent.stop();
+        res.set_content("OK", "text/plain");
+    });
+
+    // TTS voice list proxy (avoids CORS since TTS is on a different port)
+    svr.Get("/api/voices", [&cfg](const httplib::Request&, httplib::Response& res) {
+        try {
+            std::string voices_url = cfg.tts_endpoint + "voices";
+            std::map<std::string, std::string> empty_headers;
+            HTTPClient::Response tts_resp = HTTPClient::get(voices_url, empty_headers);
+            if (tts_resp.status_code == 200 && !tts_resp.text.empty()) {
+                res.set_content(tts_resp.text, "application/json");
+            } else {
+                res.status = tts_resp.status_code > 0 ? tts_resp.status_code : 502;
+            }
+        } catch (...) {
+            res.status = 502;
+        }
+    });
+
+    // TTS voice switch proxy
+    svr.Post("/api/loadVoice", [&cfg](const httplib::Request& req, httplib::Response& res) {
+        try {
+            std::map<std::string, std::string> headers = {{"Content-Type", "text/plain"}};
+            if (!cfg.api_key.empty()) {
+                headers["Authorization"] = "Bearer " + cfg.api_key;
+            }
+            HTTPClient::Response tts_resp = HTTPClient::post(cfg.tts_endpoint + "loadVoice", headers, req.body);
+            res.status = tts_resp.status_code;
+            res.set_content(tts_resp.text, "text/plain");
+        } catch (...) {
+            res.status = 502;
+        }
+    });
+
+    // Clear context/memory API
+    svr.Post("/api/clear", [&agent](const httplib::Request&, httplib::Response& res) {
+        Logger::info("[Backend] Clear context requested via Web UI!");
+        auto ctx = agent.getContext();
+        if (ctx && ctx->getMemory()) {
+            ctx->getMemory()->clear();
+        }
+        res.set_content("OK", "text/plain");
+    });
+
+    // Hook callbacks for streaming partial responses to the UI
+    agent.cb_.onPartialResponse = [&partial_mutex, &current_partial](const std::string& chunk) {
+        std::lock_guard<std::mutex> lock(partial_mutex);
+        current_partial += chunk;
+    };
+
+    agent.cb_.onFinalResponse = [&partial_mutex, &current_partial](const std::string& text) {
+        (void)text;
+        std::lock_guard<std::mutex> lock(partial_mutex);
+        current_partial.clear();
+    };
+
+    std::thread ui_thread([&svr]() {
+        Logger::info("In-Car UI server listening on http://127.0.0.1:9000");
+        svr.listen("0.0.0.0", 9000);
+    });
+
     // Get user input
-    Logger::info("Enter a question or task for the agent (or 'exit' to quit):");
+    Logger::info("Press 'a' and speak a question (or 'exit' to quit):");
 
     std::string user_input;
     while (true) {
         Logger::info("\n> ");
         std::getline(std::cin, user_input);
 
-        if (user_input == "exit" || user_input == "quit" || user_input == "q") {
-            break;
-        }
-
         if (user_input.empty()) {
             continue;
         }
 
-        try {
-            // Start a timer to measure execution time
-            auto start_time = std::chrono::high_resolution_clock::now();
-
-            // Run the agent
-            JsonObject result = blockingWait(agent.run(user_input));
-
-            // End timer
-            auto end_time = std::chrono::high_resolution_clock::now();
-            auto duration = std::chrono::duration_cast<std::chrono::seconds>(end_time - start_time).count();
-
-            // Display the final result
-            Logger::info("==================================================");
-            Logger::info("                  FINAL RESULT                    ");
-            Logger::info("==================================================");
-            Logger::info("{}", result["answer"].get<std::string>());
-
-            // Display completion statistics
-            Logger::info("\n--------------------------------------------------");
-            Logger::info("Task completed in {} seconds", duration);
-            Logger::info("==================================================");
-        } catch (const std::exception& e) {
-            Logger::error("Error: {}", e.what());
+        if (user_input == "exit" || user_input == "quit" || user_input == "q") {
+            break;
         }
+
+        if (user_input == "a") {
+            agent.listen();
+            continue;
+        }
+
+        // Run the agent
+        agent.runAsync(user_input, [&](const JsonObject& jsonPartial) {
+            if (!jsonPartial.empty() && jsonPartial.contains("part") && !jsonPartial["part"].is_null()) {
+                auto part = jsonPartial["part"].get<std::string>();
+                std::cout << part << std::flush;
+            }
+            // Note: Final result is also sent via this callback with "answer"
+            if (!jsonPartial.empty() && jsonPartial.contains("answer")) {
+                std::cout << std::endl;
+            }
+        });
     }
+
+    // Cleanup
+    agent.stop();
+    svr.stop();
+    ui_thread.join();
 
     return EXIT_SUCCESS;
 }

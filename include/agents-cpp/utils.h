@@ -12,7 +12,9 @@
 #include <agents-cpp/types.h>
 #include <agents-cpp/logger.h>
 
+#include <algorithm>
 #include <fstream>
+#include <regex>
 #include <sstream>
 
 namespace agents {
@@ -197,6 +199,196 @@ public:
         std::stringstream buffer;
         buffer << file.rdbuf();
         return buffer.str();
+    }
+
+    /**
+     * @brief Strip HTML tags from a string, producing plain text
+     *
+     * Removes script/style/nav/header/footer/noscript blocks entirely,
+     * strips remaining tags, decodes common HTML entities, and collapses whitespace.
+     *
+     * @param html The HTML string to strip
+     * @param max_length Maximum output length (0 = unlimited). Truncates at word boundary.
+     * @return Plain text extracted from the HTML
+     */
+    static std::string stripHtmlTags(const std::string& html, size_t max_length = 0) {
+        if (html.empty()) {
+            return "";
+        }
+
+        // Step 1: Remove block-level elements that typically contain non-content
+        std::string working = html;
+        std::vector<std::string> blockTags = {
+            "script", "style", "nav", "header", "footer", "noscript"
+        };
+
+        for (const auto& tag : blockTags) {
+            std::regex blockRegex(
+                "<" + tag + "[^>]*>[\\s\\S]*?</" + tag + "\\s*>",
+                std::regex::icase);
+            working = std::regex_replace(working, blockRegex, " ");
+        }
+
+        // Step 2: Replace <br>, <br/>, <br />, <p>, <div>, <li>, <tr> with newlines
+        std::regex lineBreakRegex("<(?:br|/p|/div|/li|/tr|/h[1-6])[^>]*>", std::regex::icase);
+        working = std::regex_replace(working, lineBreakRegex, "\n");
+
+        // Step 3: Strip remaining HTML tags using state machine
+        std::string text;
+        text.reserve(working.size());
+        bool inTag = false;
+
+        for (size_t i = 0; i < working.size(); ++i) {
+            char c = working[i];
+            if (c == '<') {
+                inTag = true;
+            } else if (c == '>') {
+                inTag = false;
+                text += ' ';  // Replace tag with space to prevent word joining
+            } else if (!inTag) {
+                text += c;
+            }
+        }
+
+        // Step 4: Decode common HTML entities
+        auto replaceAll = [](std::string& str, const std::string& from, const std::string& to) {
+            size_t pos = 0;
+            while ((pos = str.find(from, pos)) != std::string::npos) {
+                str.replace(pos, from.length(), to);
+                pos += to.length();
+            }
+        };
+
+        replaceAll(text, "&amp;", "&");
+        replaceAll(text, "&lt;", "<");
+        replaceAll(text, "&gt;", ">");
+        replaceAll(text, "&quot;", "\"");
+        replaceAll(text, "&#39;", "'");
+        replaceAll(text, "&apos;", "'");
+        replaceAll(text, "&nbsp;", " ");
+        replaceAll(text, "&#160;", " ");
+
+        // Decode numeric entities (&#NNN;)
+        std::regex numericEntityRegex("&#(\\d+);");
+        std::string decoded;
+        std::sregex_iterator it(text.begin(), text.end(), numericEntityRegex);
+        std::sregex_iterator end;
+        size_t lastPos = 0;
+
+        for (; it != end; ++it) {
+            decoded += text.substr(lastPos, it->position() - lastPos);
+            int codePoint = std::stoi((*it)[1].str());
+            if (codePoint >= 32 && codePoint < 127) {
+                decoded += static_cast<char>(codePoint);
+            } else {
+                decoded += ' ';
+            }
+            lastPos = it->position() + it->length();
+        }
+        decoded += text.substr(lastPos);
+        text = std::move(decoded);
+
+        // Step 5: Collapse whitespace
+        // Replace runs of spaces/tabs with single space
+        std::string collapsed;
+        collapsed.reserve(text.size());
+        bool lastWasSpace = false;
+        bool lastWasNewline = false;
+
+        for (char c : text) {
+            if (c == '\n' || c == '\r') {
+                if (!lastWasNewline) {
+                    collapsed += '\n';
+                    lastWasNewline = true;
+                }
+                lastWasSpace = false;
+            } else if (c == ' ' || c == '\t') {
+                if (!lastWasSpace && !lastWasNewline) {
+                    collapsed += ' ';
+                    lastWasSpace = true;
+                }
+            } else {
+                collapsed += c;
+                lastWasSpace = false;
+                lastWasNewline = false;
+            }
+        }
+        text = std::move(collapsed);
+
+        // Trim leading/trailing whitespace
+        Utils::trim(text);
+
+        // Step 6: Truncate at word boundary if max_length specified
+        if (max_length > 0 && text.size() > max_length) {
+            size_t cutPos = max_length;
+            // Find the last space before the cut point
+            while (cutPos > 0 && text[cutPos] != ' ' && text[cutPos] != '\n') {
+                --cutPos;
+            }
+            if (cutPos == 0) {
+                cutPos = max_length;  // No word boundary found, hard cut
+            }
+            text = text.substr(0, cutPos) + "...";
+        }
+
+        return text;
+    }
+
+    /**
+     * @brief Extract the text content of the first occurrence of a given HTML tag
+     *
+     * @param html The HTML string to search
+     * @param tag The tag name to find (e.g., "title")
+     * @return The text content within the first matching tag, or empty string if not found
+     */
+    static std::string extractHtmlTagContent(const std::string& html, const std::string& tag) {
+        if (html.empty() || tag.empty()) {
+            return "";
+        }
+
+        // Find opening tag (case-insensitive manual search)
+        std::string lowerHtml = Utils::toLower(html);
+        std::string lowerTag = Utils::toLower(tag);
+
+        std::string openPattern = "<" + lowerTag;
+        size_t openPos = lowerHtml.find(openPattern);
+        if (openPos == std::string::npos) {
+            return "";
+        }
+
+        // Find the end of the opening tag
+        size_t tagEnd = lowerHtml.find('>', openPos);
+        if (tagEnd == std::string::npos) {
+            return "";
+        }
+
+        size_t contentStart = tagEnd + 1;
+
+        // Find closing tag
+        std::string closePattern = "</" + lowerTag;
+        size_t closePos = lowerHtml.find(closePattern, contentStart);
+        if (closePos == std::string::npos) {
+            return "";
+        }
+
+        // Extract content using original (non-lowered) html to preserve casing
+        std::string content = html.substr(contentStart, closePos - contentStart);
+
+        // Strip any nested tags from the content
+        std::string plainText;
+        bool inTag = false;
+        for (char c : content) {
+            if (c == '<') {
+                inTag = true;
+            } else if (c == '>') {
+                inTag = false;
+            } else if (!inTag) {
+                plainText += c;
+            }
+        }
+
+        Utils::trim(plainText);
+        return plainText;
     }
 };
 

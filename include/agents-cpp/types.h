@@ -82,6 +82,10 @@ struct LLMResponse {
      */
     std::string content;
     /**
+     * @brief The tool call id of the response
+     */
+    std::string tool_call_id;
+    /**
      * @brief The tool calls that were made
      */
     ToolCalls tool_calls;

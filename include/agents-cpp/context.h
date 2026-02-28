@@ -94,9 +94,10 @@ public:
      * @brief Execute a tool by name using coroutines
      * @param name The name of the tool to execute
      * @param params The parameters to pass to the tool
+     * @param tool_call_id Optional tool call ID
      * @return The result of the tool execution
      */
-    Task<ToolResult> executeTool(const std::string& name, const JsonObject& params);
+    Task<ToolResult> executeTool(const std::string& name, const JsonObject& params, const std::string& tool_call_id = "");
 
     /**
      * @brief Get the memory

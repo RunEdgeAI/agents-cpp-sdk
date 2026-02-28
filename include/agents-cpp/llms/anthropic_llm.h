@@ -125,6 +125,17 @@ public:
     ) override;
 
     /**
+     * @brief Async completion chat with tools
+     * @param messages The messages
+     * @param tools The tools
+     * @return AsyncGenerator<std::string> The async generator with response and tool calls
+     */
+    AsyncGenerator<std::pair<std::string, ToolCalls>> streamChatAsyncWithTools(
+        const std::vector<Message>& messages,
+        const std::vector<std::shared_ptr<Tool>>& tools
+    ) override;
+
+    /**
      * @brief Provider-optional: Upload a local media file to the provider's file storage and
      *        return a canonical media envelope (e.g., with fileUri). Default: not supported.
      * @param local_path Local filesystem path

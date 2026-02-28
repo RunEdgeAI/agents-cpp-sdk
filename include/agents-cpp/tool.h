@@ -11,6 +11,7 @@
 
 #include <agents-cpp/types.h>
 #include <functional>
+#include <memory>
 
 namespace agents {
 

@@ -119,6 +119,17 @@ public:
         const std::vector<Message>& messages,
         const std::vector<std::shared_ptr<Tool>>& tools
     ) override;
+
+    /**
+     * @brief Async completion chat with tools
+     * @param messages The messages
+     * @param tools The tools
+     * @return AsyncGenerator<std::string> The async generator with response and tool calls
+     */
+    AsyncGenerator<std::pair<std::string, ToolCalls>> streamChatAsyncWithTools(
+        const std::vector<Message>& messages,
+        const std::vector<std::shared_ptr<Tool>>& tools
+    ) override;
 private:
     std::string api_key_;
     std::string api_base_ = "https://api.openai.com/v1";

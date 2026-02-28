@@ -29,6 +29,8 @@ public:
         std::string stt_endpoint;
         /// TTS Endpoint URL
         std::string tts_endpoint;
+        /// API key for authenticating with STT/TTS services
+        std::string api_key;
     };
 
     /**
@@ -180,6 +182,10 @@ private:
  * @param agent The VoiceAgent
  */
 static void runUI(const std::string& media_dir, httplib::Server& svr, VoiceAgent& agent) {
+    // Shared state for streaming partial responses to UI
+    std::mutex partial_mutex;
+    std::string current_partial;
+
     // 1. SERVE THE UI
     svr.Get("/", [&](const httplib::Request&, httplib::Response& res) {
         std::string html = Utils::loadHtmlFile(media_dir);
@@ -194,7 +200,7 @@ static void runUI(const std::string& media_dir, httplib::Server& svr, VoiceAgent
     });
 
     // 3. THE TRANSCRIPT API
-    svr.Get("/api/transcript", [&agent](const httplib::Request&, httplib::Response& res) {
+    svr.Get("/api/transcript", [&agent, &partial_mutex, &current_partial](const httplib::Request&, httplib::Response& res) {
         auto state = agent.getState();
         std::string state_str;
 
@@ -205,14 +211,22 @@ static void runUI(const std::string& media_dir, httplib::Server& svr, VoiceAgent
             default: state_str = "0"; break;
         }
 
-        res.set_header("X-Voice-Status", state_str);
-        // Ensure this doesn't crash if memory is empty
+        std::string summary;
         auto context = agent.getContext();
         if (context && context->getMemory()) {
-            res.set_content(context->getMemory()->getConversationSummary(), "text/plain");
-        } else {
-            res.set_content("", "text/plain");
+            summary = context->getMemory()->getConversationSummary();
         }
+
+        // Append streaming partial if available
+        {
+            std::lock_guard<std::mutex> lock(partial_mutex);
+            if (!current_partial.empty()) {
+                summary += "Assistant: " + current_partial + "\n\n";
+            }
+        }
+
+        res.set_header("X-Voice-Status", state_str);
+        res.set_content(summary, "text/plain");
     });
 
     // 4. THE STOP API
@@ -222,6 +236,17 @@ static void runUI(const std::string& media_dir, httplib::Server& svr, VoiceAgent
         agent.stop();
         res.set_content("OK", "text/plain");
     });
+
+    // 5. Hook callbacks for streaming partial responses to the UI
+    agent.cb_.onPartialResponse = [&](const std::string& chunk) {
+        std::lock_guard<std::mutex> lock(partial_mutex);
+        current_partial += chunk;
+    };
+
+    agent.cb_.onFinalResponse = [&](const std::string& text) {
+        std::lock_guard<std::mutex> lock(partial_mutex);
+        current_partial.clear();
+    };
 
     Logger::info("UI server listening on http://localhost:9000");
     svr.listen("0.0.0.0", 9000);

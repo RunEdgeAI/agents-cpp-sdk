@@ -34,34 +34,19 @@ int main() {
     // Initialize the logger
     Logger::init(Logger::Level::INFO);
 
-    // Create LLM based on user choice
-    std::shared_ptr<LLMInterface> llm;
-
-    // Check if we have any API keys configured
+    // Load user config
     auto& config = ConfigLoader::getInstance();
 
-    // Use API keys available
-    try {
-        llm = createLLM(config.get("PROVIDER"), config.get("API_KEY"), config.get("MODEL"));
-    } catch (const std::exception& e) {
-        Logger::error("Error creating LLM: {}", e.what());
-        Logger::error("Please ensure the appropriate API key is set in the environment.");
-        return EXIT_FAILURE;
-    }
+    // Create LLM based on user choice
+    std::shared_ptr<LLMInterface> llm =
+        createLLM(config.get("PROVIDER"), config.get("API_KEY"), config.get("MODEL"));
 
     // Create agent context
     auto context = std::make_shared<Context>();
     context->setLLM(llm);
 
     // Set system prompt for the context
-    context->setSystemPrompt(
-        "You are a friendly and advanced voice assistant built by Edge AI. "
-        "Be brief, concise, and to the point in your responses. "
-        "You must ALWAYS respond in at most 30 words. "
-        "You are encouraged to respond with follow-on questions if you are unsure about something. "
-        "Your output will go into a TTS engine so do not include any"
-        "special tokens or markup. Do not bold, italicize, or add any other formatting to your response. "
-    );
+    context->setSystemPrompt(config.get("SYSTEM_PROMPT"));
 
     // Register tools from tool registry
     auto registry = tools::ToolRegistry::global();
@@ -70,14 +55,12 @@ int main() {
 
     // Create the agent
     VoiceAgent::Config cfg;
-    cfg.agent_endpoint = "http://127.0.0.1:8080/agent";
-    cfg.stt_endpoint = "http://127.0.0.1:8888/";
-    cfg.tts_endpoint = "http://127.0.0.1:9999/";
+    cfg.agent_endpoint = "http://localhost:8080/agent";
+    cfg.stt_endpoint = "http://localhost:8888/";
+    cfg.tts_endpoint = "http://localhost:9999/";
+    cfg.api_key = config.get("EDGEAI_API_KEY");
 
     VoiceAgent agent(context, cfg);
-
-    // OPTIONAL: Set the agent prompt (this extends the context system prompt for the agent)
-    // agent.setAgentPrompt();
 
     // Initialize the agent
     agent.init();
@@ -85,7 +68,7 @@ int main() {
     // Run the UI in a separate thread
     httplib::Server svr;
     // NOTE: Access to agent from UI and CLI is mutually exclusive in this demo
-    std::thread ui_thread(runUI, "./index.html", std::ref(svr), std::ref(agent));
+    std::thread ui_thread(runUI, "sample_media/ui/index.html", std::ref(svr), std::ref(agent));
 
     // Get user input
     Logger::info("==================================================");
@@ -112,12 +95,20 @@ int main() {
         }
 
         // otherwise run agent with text provided
-        JsonObject json = blockingWait(agent.run(user_input));
-        Logger::info("Assistant: {}", json["answer"].get<std::string>());
+        agent.runAsync(user_input, [&](const JsonObject& jsonPartial) {
+            if (!jsonPartial.empty() && jsonPartial.contains("part") && !jsonPartial["part"].is_null()) {
+                auto part = jsonPartial["part"].get<std::string>();
+                std::cout << part << std::flush;
+            }
+            // Note: Final result is also sent via this callback with "answer"
+            if (!jsonPartial.empty() && jsonPartial.contains("answer")) {
+                std::cout << std::endl;
+            }
+        });
     }
 
+    // Cleanup
     agent.stop();
-    // Stop the UI server
     svr.stop();
     ui_thread.join();
 
