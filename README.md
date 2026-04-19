@@ -26,7 +26,7 @@
   - ReAct (Reason + Act)
   - CoT (Chain-of-Thought)  [In Development]
   - Plan and Execute
-  - Zero-Shot [In Development]
+  - Zero-Shot
   - Reflexion [In Development]
 - **Extensible Tooling System** — Plug in your own tools or use built-in ones (Web Search, Wikipedia, Python Executor, etc).
 
