@@ -58,7 +58,7 @@
    - For OpenAI models: Get an API key from [OpenAI's platform](https://platform.openai.com/api-keys)
    - For Anthropic models: Get an API key from [Anthropic's console](https://console.anthropic.com/account/keys)
    - For Google models: Get an API key from [Google AI Studio](https://ai.google.dev/)
-   - For Websearch tool: Get an API key from [serpapi](https://serpapi.com)
+   - For Websearch tool: Get an API key from [brave search](https://brave.com/search/api/)
 
 ### Building
 
