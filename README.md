@@ -30,15 +30,15 @@
   - Reflexion [In Development]
 - **Extensible Tooling System** — Plug in your own tools or use built-in ones (Web Search, Wikipedia, Python Executor, etc).
 
-## Pre-requisites
+## Requirements
 
 - C++20 compatible compiler (GCC 14+, Clang 17+, MSVC 2022+)
 - Bazel 8.3.1+ (https://bazel.build/install)
 
 - Dependencies (already provided for convenience)
-   - python3 (3.11+)
    - nlohmann/json
    - spdlog
+- Optional: `python3` in PATH to use the Python execution tool
 
 ## Quick Start
 
@@ -98,13 +98,6 @@ The framework will check for API keys in the following order:
 1. `.env` file
 2. Environment variables
 3. Command-line arguments
-
-#### Python Tool Setup
-In order to use the Python Code Execution Tool, ensure your Python environment is correctly configured so that the SDK can locate your Python runtime and libraries.
-```bash
-export PYTHONHOME=$(python3 -c "import sys; print(sys.prefix)")
-export PYTHONPATH=$(python3 -c "import sysconfig; print(sysconfig.get_path('stdlib'))")
-```
 
 ### Usage
 
@@ -301,7 +294,7 @@ public:
 
 ## Running in Production?
 
-Don't let infrastructure slow you down. Our Pro version helps accelerate your roadmap with: 
+Don't let infrastructure slow you down. Our Pro version helps accelerate your roadmap with:
 
 * **MCP Support:** Enable your agent to utilize local and remote MCPs.
 * **Premium Tools:** Access the complete set of tools supported natively including: weather, research, wolfram-alpha, and more.

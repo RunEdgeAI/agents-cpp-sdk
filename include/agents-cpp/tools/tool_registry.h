@@ -9,10 +9,8 @@
  */
 #pragma once
 
+#include <agents-cpp/llm_interface.h>
 #include <agents-cpp/tool.h>
-#include <agents-cpp/tools/media_loader_tool.h>
-#include <agents-cpp/tools/summarization_tool.h>
-#include <agents-cpp/tools/wiki_tool.h>
 
 #include <map>
 #include <memory>
@@ -106,6 +104,13 @@ private:
 std::shared_ptr<Tool> createShellCommandTool();
 
 /**
+ * @brief Creates a tool for performing web searches via Brave Search API
+ *
+ * @return Pointer to tool
+ */
+std::shared_ptr<Tool> createBraveSearchTool();
+
+/**
  * @brief Creates a tool for performing web searches
  *
  * @return Pointer to tool
@@ -161,6 +166,34 @@ std::shared_ptr<Tool> createMediaLoaderTool(std::shared_ptr<LLMInterface> llm);
  * @return Pointer to tool
  */
 std::shared_ptr<Tool> createRespondTool();
+
+/**
+ * @brief Creates a tool for fetching web page content
+ *
+ * @return Pointer to tool
+ */
+std::shared_ptr<Tool> createFetchWebpageTool();
+
+/**
+ * @brief Creates a tool for getting current weather conditions
+ *
+ * @return Pointer to tool
+ */
+std::shared_ptr<Tool> createWeatherTool();
+
+/**
+ * @brief Creates a tool for getting the current date and time
+ *
+ * @return Pointer to tool
+ */
+std::shared_ptr<Tool> createDatetimeTool();
+
+/**
+ * @brief Creates a tool for evaluating mathematical expressions
+ *
+ * @return Pointer to tool
+ */
+std::shared_ptr<Tool> createCalculatorTool();
 
 } // namespace tools
 } // namespace agents

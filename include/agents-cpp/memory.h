@@ -10,6 +10,7 @@
 #pragma once
 
 #include <agents-cpp/types.h>
+#include <agents-cpp/llm_interface.h>
 #include <memory>
 #include <optional>
 #include <vector>
@@ -90,7 +91,15 @@ public:
     virtual JsonObject getConversationHistory() const = 0;
 
     /**
-     * @brief Semantic search in memory
+     * @brief Flush ephemeral memory to persistent storage (pre-compaction hook).
+     *        If an LLM is provided, performs a silent agentic turn to intelligently
+     *        extract and persist key facts from the conversation before compaction.
+     * @param llm Optional LLM to use for intelligent fact extraction
+     */
+    virtual void flushToPersistent(std::shared_ptr<LLMInterface> llm = nullptr) = 0;
+
+    /**
+     * @brief Semantic search in memory with hybrid scoring (vector + BM25 + temporal decay)
      * @param query The query to search for
      * @param type The type of memory to search
      * @param max_results The maximum number of results to return
@@ -101,6 +110,20 @@ public:
         MemoryType type = MemoryType::LONG_TERM,
         int max_results = 5
     ) const = 0;
+
+    /**
+     * @brief Add a fact to long-term memory (persistent facts)
+     * @param key The key to add
+     * @param value The value to add
+     */
+    virtual void addFact(const std::string& key, const JsonObject& value) = 0;
+
+    /**
+     * @brief Get a fact from long-term memory
+     * @param key The key to get
+     * @return The fact
+     */
+    virtual std::optional<JsonObject> getFact(const std::string& key) const = 0;
 };
 
 /**

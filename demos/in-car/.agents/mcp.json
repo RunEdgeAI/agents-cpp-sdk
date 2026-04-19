@@ -1,0 +1,15 @@
+{
+  "servers": [
+    {
+      "name": "applemusic",
+      "type": "stdio",
+      "command": "env",
+      "args": [
+        "-u", "PYTHONHOME",
+        "-u", "PYTHONPATH",
+        "-u", "PYTHONSTARTUP",
+        "uvx", "-p", "3.13", "-n", "mcp-applemusic"
+      ]
+    }
+  ]
+}

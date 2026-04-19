@@ -254,14 +254,6 @@ private:
         const DirectAnswer& directAnswer = {},
         const std::vector<FetchedPageContent>& fetchedPages = {}) const;
 
-    // LLM-powered summarization
-    std::string generateLLMSummary(
-        const std::string& query,
-        const std::vector<SearchResult>& results,
-        const KnowledgeGraphInfo& kg,
-        const DirectAnswer& directAnswer = {},
-        const std::vector<FetchedPageContent>& fetchedPages = {}) const;
-
     // Helper methods
     std::string extractSourceName(const std::string& url) const;
 };

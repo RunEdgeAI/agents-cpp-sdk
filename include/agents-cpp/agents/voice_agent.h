@@ -181,6 +181,7 @@ private:
  * @param svr The HTTP server
  * @param agent The VoiceAgent
  */
+__attribute__((unused))
 static void runUI(const std::string& media_dir, httplib::Server& svr, VoiceAgent& agent) {
     // Shared state for streaming partial responses to UI
     std::mutex partial_mutex;
@@ -245,6 +246,7 @@ static void runUI(const std::string& media_dir, httplib::Server& svr, VoiceAgent
 
     agent.cb_.onFinalResponse = [&](const std::string& text) {
         std::lock_guard<std::mutex> lock(partial_mutex);
+        (void)text;
         current_partial.clear();
     };
 

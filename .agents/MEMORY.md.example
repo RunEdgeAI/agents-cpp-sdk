@@ -1,0 +1,7 @@
+## Persistent Memory
+<!-- Copy this file to MEMORY.md. The agent writes remembered facts here across sessions.
+     You can also seed it with project context the agent should always know. Examples:
+     - This project uses Python 3.12 and Poetry
+     - Deployments go to prod via `make deploy`
+     - Never modify the legacy/ directory without approval
+-->

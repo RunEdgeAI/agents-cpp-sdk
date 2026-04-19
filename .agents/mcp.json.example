@@ -1,0 +1,33 @@
+{
+  "servers": [
+    {
+      "name": "filesystem",
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-filesystem", "~/Documents"]
+    },
+    {
+      "name": "gmail",
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-gmail"],
+      "env": {
+        "GMAIL_OAUTH_TOKEN": "${GMAIL_OAUTH_TOKEN}"
+      }
+    },
+    {
+      "name": "google-calendar",
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-google-calendar"],
+      "env": {
+        "GOOGLE_OAUTH_TOKEN": "${GOOGLE_OAUTH_TOKEN}"
+      }
+    },
+    {
+      "name": "my-remote-server",
+      "type": "sse",
+      "url": "http://localhost:8080/sse"
+    }
+  ]
+}

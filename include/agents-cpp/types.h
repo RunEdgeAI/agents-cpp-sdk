@@ -146,6 +146,15 @@ struct Message {
 };
 
 /**
+ * @brief Trust level for the context execution environment
+ */
+enum class TrustLevel {
+    FULL,       /**< Full access to all tools and capabilities */
+    SANDBOXED,  /**< Sandboxed access, tools might be restricted or simulated */
+    READONLY    /**< Read-only access, state mutating tools are blocked */
+};
+
+/**
  * @brief Memory types
  * @note This is a type of memory. It contains the type of memory, the name of the memory,
  * and the content of the memory.

@@ -10,10 +10,11 @@
 #pragma once
 
 #include <spdlog/fmt/fmt.h>
-#include <memory>
-#include <string>
 #include <spdlog/spdlog.h>
 #include <spdlog/sinks/stdout_color_sinks.h>
+#include <cstdio>
+#include <memory>
+#include <string>
 
 namespace agents {
 
@@ -133,6 +134,19 @@ public:
     template<typename... Args>
     static void critical(fmt::format_string<Args...> fmt, Args&&... args) {
         spdlog::critical(fmt, std::forward<Args>(args)...);
+    }
+
+    /**
+     * @brief Write a raw chunk of text to stdout without any log prefix or newline.
+     *        Flushes immediately — intended for streaming token output.
+     *        Respects the current log level: suppressed when level > INFO.
+     * @param text The text chunk to write
+     */
+    static void chunk(const std::string& text) {
+        if (spdlog::get_level() <= spdlog::level::info) {
+            std::fputs(text.c_str(), stdout);
+            std::fflush(stdout);
+        }
     }
 
 private:

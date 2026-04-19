@@ -1,0 +1,62 @@
+# Use the official Ubuntu 22.04 ARM64 image to match JetPack 6
+FROM arm64v8/ubuntu:22.04
+
+# Prevent interactive prompts during build
+ENV DEBIAN_FRONTEND=noninteractive
+
+# 1. Install basic dependencies
+RUN apt-get update && apt-get install -y \
+    wget \
+    curl \
+    cmake \
+    git \
+    build-essential \
+    ca-certificates \
+    pkg-config \
+    portaudio19-dev \
+    sudo \
+    && rm -rf /var/lib/apt/lists/*
+
+
+# 3. Create the 'builder' user
+# -m creates home dir, -s sets shell to bash, -G sudo adds to sudo group
+RUN useradd -m -s /bin/bash -G sudo builder
+
+# 4. Enable passwordless sudo for the 'sudo' group
+# (So you can run 'sudo apt-get install' without typing a password)
+RUN echo '%sudo ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers
+
+# 2. Install Mamba (Miniforge) for ARM64
+# This provides the infrastructure to install GCC 14 on an older Ubuntu base
+RUN wget https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-Linux-aarch64.sh -O /tmp/miniforge.sh && \
+    /bin/bash /tmp/miniforge.sh -b -p /home/builder/mambaforge && \
+    /home/builder/mambaforge/bin/mamba shell init -s bash && \
+    rm /tmp/miniforge.sh && \
+    chown -R builder:builder /home/builder/mambaforge/
+
+# Add Conda/Mamba to path
+ENV PATH="/home/builder/mambaforge/bin:${PATH}"
+
+# 3. Use Mamba to install GCC 14 and G++ 14 from conda-forge
+# We also install sysroot_linux-aarch64 to ensure the linker is correct
+
+RUN mamba install conda-forge::gcc=14.1.0 conda-forge::gxx=14.1.0
+
+# Verify installations
+RUN gcc --version && g++ --version
+
+RUN wget https://github.com/bazelbuild/bazelisk/releases/download/v1.19.0/bazelisk-linux-arm64 -O /usr/local/bin/bazel && \
+    chmod +x /usr/local/bin/bazel
+
+# Create a dedicated bazel cache directory and give permissions
+RUN mkdir -p /workspace/.bazel_cache
+ENV BAZEL_WRKDIR=/workspace/.bazel_cache
+
+# Tell Bazel to use this directory via environment variable
+ENV BAZEL_OPTS="--output_user_root=/workspace/.bazel_cache"
+
+# 5. Set the default user and workdir
+USER builder
+
+WORKDIR /workspace
+CMD ["/bin/bash"]
