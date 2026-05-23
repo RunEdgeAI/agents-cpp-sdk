@@ -307,6 +307,16 @@ Don't let infrastructure slow you down. Our Pro version helps accelerate your ro
 - Email: support@runedge.ai
 - Discord: https://discord.gg/D5unWmt8
 
+## Star History
+
+<a href="https://www.star-history.com/?repos=RunEdgeAI%2Fagents-cpp-sdk&type=date&legend=top-left">
+ <picture>
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=RunEdgeAI/agents-cpp-sdk&type=date&theme=dark&legend=top-left" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=RunEdgeAI/agents-cpp-sdk&type=date&legend=top-left" />
+   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=RunEdgeAI/agents-cpp-sdk&type=date&legend=top-left" />
+ </picture>
+</a>
+
 ## Acknowledgements
 
 This implementation is inspired by Anthropic's article ["Building effective agents"](https://www.anthropic.com/research/building-effective-agents) and re-engineered in C++ for real-time, low overhead usage on edge devices.
