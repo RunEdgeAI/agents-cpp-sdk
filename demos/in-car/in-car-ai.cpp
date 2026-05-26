@@ -1,18 +1,18 @@
 /**
  * @example in-car-ai.cpp
  * @brief In-Car AI Demo
- * @version 0.3
- * @date 2025-07-20
+ * @version 0.4
+ * @date 2026-05-02
  *
  * @copyright Copyright (c) 2026 Edge AI, LLC. All rights reserved.
  */
 #include "ui.hpp"
+#include "nav_tools.hpp"
 
 #include <agents-cpp/config_loader.h>
 #include <agents-cpp/tools/tool_registry.h>
 
 #include <iostream>
-#include <regex>
 
 using namespace agents;
 
@@ -24,6 +24,12 @@ int main() {
     std::shared_ptr<LLMInterface> llm;
     try {
         llm = createLLM(config.get("PROVIDER"), config.get("API_KEY"), config.get("MODEL"));
+        auto effort = config.get("THINK");
+        if (!effort.empty()) {
+            auto options = llm->getOptions();
+            options.reasoning_effort = effort;
+            llm->setOptions(options);
+        }
     } catch (const std::exception& e) {
         Logger::error("Error creating LLM: {}", e.what());
         return EXIT_FAILURE;
@@ -31,7 +37,6 @@ int main() {
 
     // ── Context ───────────────────────────────────────────────────────────────
     auto context = std::make_shared<Context>(llm);
-    context->setTrustLevel(TrustLevel::FULL);
 
     // Persona, behavior rules, MCP servers, and skills loaded from markdown files.
     // demos/in-car/.agents/ is scanned first, cwd/.agents/, then root .agents/.
@@ -44,63 +49,7 @@ int main() {
 
     // Shared vehicle state — written by tools below, read by the UI server
     VehicleState vehicle;
-
-    auto navigation_tool = createTool(
-        "navigate",
-        "Provides turn-by-turn navigation to a destination. "
-        "Accepts start/end as addresses or lat/lon pairs (never both). "
-        "Prefer this over web search for directions.",
-        {
-            {"start_address", "Starting address",       "string", false},
-            {"end_address",   "Destination address",    "string", false},
-            {"start_long",    "Starting longitude",     "number", false},
-            {"start_lat",     "Starting latitude",      "number", false},
-            {"end_long",      "Destination longitude",  "number", false},
-            {"end_lat",       "Destination latitude",   "number", false},
-        },
-        [&config, &vehicle](const JsonObject& params) -> ToolResult {
-            const std::string url = "https://maps.googleapis.com/maps/api/directions/json";
-
-            auto build_location = [&](const std::string& prefix) -> std::string {
-                if (params.contains(prefix + "_lat") && params[prefix + "_lat"] != nullptr &&
-                    params.contains(prefix + "_long") && params[prefix + "_long"] != nullptr)
-                    return std::to_string(params[prefix + "_lat"].get<double>()) + "," +
-                           std::to_string(params[prefix + "_long"].get<double>());
-                if (params.contains(prefix + "_address") && params[prefix + "_address"] != nullptr)
-                    return params[prefix + "_address"].get<std::string>();
-                return "";
-            };
-
-            static const std::regex tag_re("<[^>]*>");
-            auto strip_html = [](const std::string& s) {
-                return std::regex_replace(s, std::regex("<[^>]*>"), "");
-            };
-
-            httplib::Params nav_params = {
-                {"origin",      build_location("start")},
-                {"destination", build_location("end")},
-                {"key",         config.get("MAPS_API_KEY")}
-            };
-            std::map<std::string, std::string> headers = {{"Accept", "application/json"}};
-            HTTPClient::Response resp = HTTPClient::get(url, nav_params, headers);
-
-            std::string directions = "Directions: ";
-            bool ret = true;
-            if (resp.status_code == 200) {
-                JsonObject j = JsonObject::parse(resp.text);
-                for (const auto& route : j["routes"])
-                    for (const auto& leg : route["legs"])
-                        for (const auto& step : leg["steps"])
-                            directions += strip_html(step["html_instructions"].get<std::string>()) + ". ";
-            } else {
-                ret = false;
-                directions = "Failed to fetch navigation data";
-            }
-
-            { std::lock_guard<std::mutex> lk(vehicle.nav_mutex); vehicle.nav_json = resp.text; }
-            return ToolResult{ret, directions, {{"navigation_data", JsonObject::parse(resp.text)}}};
-        }
-    );
+    incar_nav::registerNavTools(*context, vehicle);
 
     auto location_tool = createTool(
         "get_location",
@@ -112,15 +61,35 @@ int main() {
         },
         [](const JsonObject& params) -> ToolResult {
             bool want_address = params.contains("address") && params["address"].get<bool>();
+
+            // query a free IP-based geolocation service.
             JsonObject loc;
-            loc["latitude"]  = 37.8052;
-            loc["longitude"] = -122.432091;
-            if (want_address) loc["address"] = "2 Marina Blvd, San Francisco, CA";
+            try {
+                auto resp = HTTPClient::get("https://ipapi.co/json/", {}, {{"User-Agent", "agents-cpp/in-car"}}, 5000);
+                if (!resp.error && resp.status_code == 200) {
+                    auto body = JsonObject::parse(resp.text);
+                    loc["latitude"]  = body.value("latitude", 0.0);
+                    loc["longitude"] = body.value("longitude", 0.0);
+                    if (want_address) {
+                        std::string addr;
+                        if (body.contains("city"))    addr += body.value("city", "");
+                        if (body.contains("region"))  addr += (addr.empty() ? "" : ", ") + body.value("region", "");
+                        if (body.contains("country_code")) addr += (addr.empty() ? "" : ", ") + body.value("country_code", "");
+                        if (!addr.empty()) loc["address"] = addr;
+                    }
+                }
+            } catch (...) { /* fall through to error below */ }
+
+            if (!loc.contains("latitude") || !loc.contains("longitude")) {
+                return ToolResult{false,
+                    "Unable to determine current location (geolocation lookup failed).",
+                    JsonObject()};
+            }
 
             std::string result = "Current location: (" +
                 std::to_string(loc["latitude"].get<double>()) + ", " +
                 std::to_string(loc["longitude"].get<double>()) + ")";
-            if (want_address) result += " — " + loc["address"].get<std::string>();
+            if (loc.contains("address")) result += " — " + loc["address"].get<std::string>();
             return ToolResult{true, result, {{"location", loc}}};
         }
     );
@@ -146,7 +115,6 @@ int main() {
         }
     );
 
-    context->registerTool(navigation_tool);
     context->registerTool(location_tool);
     context->registerTool(ac_tool);
 
@@ -172,7 +140,7 @@ int main() {
     std::string input;
     while (true) {
         Logger::chunk("\n> ");
-        std::getline(std::cin, input);
+        if (!std::getline(std::cin, input)) break;
         if (input.empty()) continue;
         if (input == "exit" || input == "quit" || input == "q") break;
         if (input == "a") { agent.listen(); continue; }

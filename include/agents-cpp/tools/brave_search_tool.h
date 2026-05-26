@@ -4,7 +4,7 @@
  * @version 0.1
  * @date 2025-04-11
  *
- * @copyright Copyright (c) 2025 Edge AI, LLC. All rights reserved.
+ * @copyright Copyright (c) 2026 Edge AI, LLC. All rights reserved.
  *
  * Requires WEBSEARCH_API_KEY set to a Brave Search API key.
  * Free tier: 2,000 queries/month — https://api.search.brave.com

@@ -4,7 +4,7 @@
  * @version 0.1
  * @date 2025-01-27
  *
- * @copyright Copyright (c) 2025 Edge AI, LLC. All rights reserved.
+ * @copyright Copyright (c) 2026 Edge AI, LLC. All rights reserved.
  *
  */
 #include <agents-cpp/config_loader.h>

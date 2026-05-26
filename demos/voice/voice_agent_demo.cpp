@@ -4,7 +4,7 @@
  * @version 0.1
  * @date 2025-07-20
  *
- * @copyright Copyright (c) 2025 Edge AI, LLC. All rights reserved.
+ * @copyright Copyright (c) 2026 Edge AI, LLC. All rights reserved.
  *
  */
 #include <agents-cpp/agents/voice_agent.h>
@@ -12,6 +12,7 @@
 #include <agents-cpp/http_client.h>
 #include <agents-cpp/logger.h>
 #include <agents-cpp/tools/tool_registry.h>
+#include "ui.hpp"
 
 #include <chrono>
 #include <csignal>
@@ -66,9 +67,13 @@ int main() {
     agent.init();
 
     // Run the UI in a separate thread
-    httplib::Server svr;
     // NOTE: Access to agent from UI and CLI is mutually exclusive in this demo
-    std::thread ui_thread(runUI, "sample_media/ui/index.html", std::ref(svr), std::ref(agent));
+    // ── UI server ─────────────────────────────────────────────────────────────
+    InCarUI ui;
+    VehicleState state;
+    agent.cb_.onPartialResponse = [&ui](const std::string& chunk) { ui.onPartialResponse(chunk); };
+    agent.cb_.onFinalResponse   = [&ui](const std::string& text)  { ui.onFinalResponse(text);   };
+    ui.start(agent, context, cfg, state);
 
     // Get user input
     Logger::info("==================================================");
@@ -109,8 +114,7 @@ int main() {
 
     // Cleanup
     agent.stop();
-    svr.stop();
-    ui_thread.join();
+    ui.stop();
 
     return EXIT_SUCCESS;
 }

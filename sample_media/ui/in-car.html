@@ -8,6 +8,13 @@
     <style>
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
+        html {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background: var(--bg);
+        }
+
         :root {
             --bg: #07070a;
             --glass: rgba(255, 255, 255, 0.04);
@@ -20,16 +27,150 @@
             --nav-width: 420px;
             --music-accent: 230, 120, 255;
             --music-width: 320px;
+            --mobile-browser-top-guard: 0px;
+            --mobile-browser-bottom-guard: 0px;
+            --mobile-dock-bottom-guard: 0px;
         }
 
         body {
             background: var(--bg);
             color: #fff;
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            width: 100%;
+            min-height: 100vh;
             height: 100vh;
+            height: 100svh;
+            height: 100dvh;
+            height: var(--app-height, 100dvh);
+            max-height: var(--app-height, 100dvh);
             overflow: hidden;
             display: flex;
             flex-direction: column;
+            touch-action: manipulation;
+            -webkit-text-size-adjust: 100%;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        /* --- CYBERPUNK / JARVIS BACKDROP ---------------------------------
+           Layered ambient backdrop. Pointer-events:none everywhere; everything
+           tints from --state-color so panels visually inherit the orb's mood. */
+        .cyber-bg {
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            overflow: hidden;
+            z-index: 0;
+        }
+
+        /* Tron-style perspective grid receding to a horizon. Two copies — one
+           at the bottom (floor) and one at the top (ceiling, mirrored). The
+           background-position animation makes each grid slowly scroll *toward*
+           the camera, giving a sense of motion. */
+        .cyber-grid {
+            position: absolute;
+            left: -50%;
+            width: 200%;
+            height: 70%;
+            background-image:
+                linear-gradient(to right, rgba(var(--state-color), 0.32) 1px, transparent 1px),
+                linear-gradient(to bottom, rgba(var(--state-color), 0.32) 1px, transparent 1px);
+            background-size: 64px 64px;
+            opacity: 0.18;
+            transition: opacity 1.5s ease;
+        }
+        .cyber-grid-bottom {
+            bottom: -28%;
+            transform: perspective(520px) rotateX(62deg);
+            transform-origin: top center;
+            -webkit-mask-image: linear-gradient(to top, black 25%, transparent 95%);
+                    mask-image: linear-gradient(to top, black 25%, transparent 95%);
+            animation: cyber-grid-flow 9s linear infinite;
+        }
+        .cyber-grid-top {
+            top: -28%;
+            transform: perspective(520px) rotateX(-62deg);
+            transform-origin: bottom center;
+            -webkit-mask-image: linear-gradient(to bottom, black 25%, transparent 95%);
+                    mask-image: linear-gradient(to bottom, black 25%, transparent 95%);
+            animation: cyber-grid-flow 9s linear infinite reverse;
+            opacity: 0.08;
+        }
+        @keyframes cyber-grid-flow {
+            from { background-position: 0 0; }
+            to   { background-position: 0 64px; }
+        }
+
+        /* Respect reduced-motion preferences. */
+        @media (prefers-reduced-motion: reduce) {
+            .cyber-grid { animation: none; }
+        }
+
+        /* --- STATE-REACTIVE GRID INTENSITY ------------------------------
+           Subtle: grid brightens slightly and scrolls a touch faster while
+           the agent is active. Idle = cascade default. */
+        body[data-state="listening"]  .cyber-grid { opacity: 0.28; animation-duration: 6.5s; }
+        body[data-state="processing"] .cyber-grid { opacity: 0.34; animation-duration: 4.5s; }
+        body[data-state="speaking"]   .cyber-grid { opacity: 0.30; animation-duration: 7.0s; }
+
+        .cyber-grid {
+            transition: opacity 0.7s ease;
+        }
+
+        /* --- BRAND WORDMARK --------------------------------------------- */
+        .brand-wordmark {
+            position: fixed;
+            top: calc(22px + var(--mobile-browser-top-guard));
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 6;
+            pointer-events: none;
+            mix-blend-mode: screen;
+        }
+        .brand-logo {
+            display: block;
+            height: 22px;       /* swap height when real logo is dropped in */
+            width: auto;
+            filter: drop-shadow(0 0 10px rgba(var(--state-color), 0.35));
+        }
+        .brand-text {
+            display: inline-flex;
+            align-items: baseline;
+            gap: 0.55em;
+            font-family: 'SF Pro Display', -apple-system, 'Segoe UI', sans-serif;
+            font-weight: 200;
+            font-size: 14px;
+            letter-spacing: 0.42em;
+            text-transform: uppercase;
+            color: rgba(255, 255, 255, 0.92);
+            text-shadow: 0 0 14px rgba(var(--state-color), 0.45);
+            transition: text-shadow 0.7s ease;
+        }
+        .brand-text-ai {
+            font-weight: 600;
+            color: rgba(var(--state-color), 1);
+            letter-spacing: 0.42em;
+            transition: color 0.7s ease;
+        }
+
+        /* --- BOOT SEQUENCE ---------------------------------------------
+           One-shot reveal on page load. Keyframes intentionally specify only
+           the `from` state so that on completion the cascade default takes
+           over (no fight with [data-state] selectors later). fill-mode:
+           backwards holds the from-state during the delay. */
+        @keyframes boot-fade      { from { opacity: 0; } }
+        @keyframes boot-wordmark  { 0% { opacity: 0; letter-spacing: 1.4em; filter: blur(4px); } 60% { opacity: 1; filter: blur(0); } }
+
+        /* Boot animations run once, with staggered delays. The dashboard and
+           orb are NOT touched — only the new background chrome. */
+        .cyber-grid       { animation: cyber-grid-flow 9s linear infinite, boot-fade 1.2s ease-out 0.05s backwards; }
+        .cyber-grid-top   { animation: cyber-grid-flow 9s linear infinite reverse, boot-fade 1.2s ease-out 0.15s backwards; }
+        .brand-wordmark   { animation: boot-wordmark 1.6s cubic-bezier(0.2, 0.7, 0.2, 1) 1.0s backwards; }
+
+        /* On reduced motion, skip the boot animation entirely. */
+        @media (prefers-reduced-motion: reduce) {
+            .cyber-grid, .cyber-grid-top, .brand-wordmark {
+                animation: none !important;
+            }
         }
 
         /* --- FILM GRAIN OVERLAY --- */
@@ -85,7 +226,7 @@
         .panel-collapse {
             position: absolute;
             top: 10px;
-            z-index: 30;
+            z-index: 1000;
             width: 28px;
             height: 28px;
             border-radius: 50%;
@@ -126,19 +267,12 @@
             left: 10px;
         }
 
-        /* --- MAP --- */
-        .nav-map-container {
-            width: var(--nav-width);
-            height: 240px;
-            flex-shrink: 0;
-            border-bottom: 1px solid var(--glass-border);
-            position: relative;
-        }
-
+        /* --- MAP (fills the entire nav panel) --- */
         #nav-map {
-            width: 100%;
-            height: 100%;
+            position: absolute;
+            inset: 0;
             background: #0d0d14;
+            z-index: 0;
         }
 
         /* Override Leaflet for dark theme */
@@ -146,6 +280,8 @@
         .leaflet-control-attribution { display: none !important; }
         .leaflet-control-zoom {
             border: 1px solid rgba(255,255,255,0.1) !important;
+            margin-top: 110px !important;
+            margin-left: 14px !important;
         }
         .leaflet-control-zoom a {
             background: rgba(10,10,18,0.9) !important;
@@ -157,94 +293,209 @@
             color: #fff !important;
         }
 
-        /* --- NAV HEADER --- */
-        .nav-header {
-            width: var(--nav-width);
-            padding: 16px 20px 12px;
-            border-bottom: 1px solid var(--glass-border);
-            flex-shrink: 0;
-        }
-
-        .nav-header-label {
-            font-size: 10px;
-            text-transform: uppercase;
-            letter-spacing: 2px;
-            color: rgba(var(--nav-accent), 0.7);
-            margin-bottom: 6px;
-        }
-
-        .nav-route-summary {
+        /* --- MANEUVER BANNER (top overlay) --- */
+        .nav-maneuver {
+            position: absolute;
+            top: 12px; left: 12px; right: 12px;
+            z-index: 30;
             display: none;
+            align-items: center;
             gap: 14px;
-            align-items: baseline;
+            padding: 14px 16px;
+            border-radius: 16px;
+            background: rgba(20, 22, 30, 0.85);
+            border: 1px solid rgba(255,255,255,0.08);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            box-shadow: 0 8px 30px rgba(0,0,0,0.45);
         }
-        .nav-route-summary.active { display: flex; }
+        .nav-maneuver.active { display: flex; }
 
-        .nav-duration {
-            font-size: 28px;
+        .nav-maneuver-glyph {
+            width: 56px; height: 56px;
+            flex-shrink: 0;
+            border-radius: 14px;
+            background: rgba(var(--nav-active), 0.15);
+            border: 1px solid rgba(var(--nav-active), 0.3);
+            display: flex; align-items: center; justify-content: center;
+        }
+        .nav-maneuver-glyph svg {
+            width: 34px; height: 34px;
+            fill: none;
+            stroke: rgba(var(--nav-active), 1);
+            stroke-width: 2.2;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+        }
+
+        .nav-maneuver-text {
+            flex: 1; min-width: 0;
+        }
+        .nav-maneuver-distance {
+            font-size: 26px;
             font-weight: 600;
             color: #fff;
             line-height: 1;
+            letter-spacing: -0.5px;
         }
-
-        .nav-distance {
+        .nav-maneuver-instruction {
             font-size: 13px;
-            color: var(--text-muted);
+            color: rgba(255,255,255,0.7);
+            margin-top: 4px;
+            line-height: 1.35;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
         }
 
-        .nav-destination {
+        /* --- BOTTOM OVERLAY: ETA strip + collapsible steps sheet --- */
+        .nav-bottom {
+            position: absolute;
+            bottom: 12px; left: 12px; right: 12px;
+            z-index: 30;
+            display: none;
+            flex-direction: column;
+            border-radius: 16px;
+            background: rgba(20, 22, 30, 0.88);
+            border: 1px solid rgba(255,255,255,0.08);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            box-shadow: 0 8px 30px rgba(0,0,0,0.45);
+            overflow: hidden;
+        }
+        .nav-bottom.active { display: flex; }
+
+        /* Multi-stop indicator: appears above the ETA stats when the active
+           route has more than one leg. Matches the orange waypoint marker
+           on the map so the visual tie is obvious. Hidden on single-stop. */
+        .nav-next-stop {
+            display: none;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 16px 0;
+        }
+        .nav-next-stop.active { display: flex; }
+        .nav-next-stop-dot {
+            width: 7px; height: 7px;
+            flex-shrink: 0;
+            border-radius: 50%;
+            background: rgb(255, 200, 100);
+            box-shadow: 0 0 6px rgba(255, 200, 100, 0.6);
+        }
+        .nav-next-stop-label {
+            flex-shrink: 0;
+            font-size: 9px;
+            text-transform: uppercase;
+            letter-spacing: 1.4px;
+            color: rgba(255, 200, 100, 0.85);
+        }
+        .nav-next-stop-address {
+            flex: 1;
+            min-width: 0;
             font-size: 12px;
-            color: rgba(255, 255, 255, 0.45);
-            margin-top: 4px;
+            font-weight: 500;
+            color: rgba(255, 255, 255, 0.9);
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
         }
 
-        /* --- CURRENT INSTRUCTION --- */
-        .nav-current {
-            display: none;
-            width: var(--nav-width);
-            padding: 14px 20px;
-            background: rgba(var(--nav-active), 0.06);
-            border-bottom: 1px solid rgba(var(--nav-active), 0.12);
-            flex-shrink: 0;
+        .nav-eta {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            padding: 12px 16px;
         }
-        .nav-current.active { display: block; }
-
-        .nav-current-label {
+        .nav-eta-stat {
+            flex: 1;
+            min-width: 0;
+            text-align: center;
+        }
+        .nav-eta-stat:first-child { text-align: left; }
+        .nav-eta-stat:nth-child(3) { text-align: right; }
+        .nav-eta-value {
+            font-size: 16px;
+            font-weight: 600;
+            color: #fff;
+            line-height: 1.1;
+            letter-spacing: -0.3px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .nav-eta-label {
             font-size: 9px;
             text-transform: uppercase;
-            letter-spacing: 2px;
-            color: rgba(var(--nav-active), 0.6);
-            margin-bottom: 4px;
+            letter-spacing: 1.4px;
+            color: rgba(255,255,255,0.4);
+            margin-top: 3px;
         }
 
-        .nav-current-instruction {
-            font-size: 16px;
-            font-weight: 500;
-            color: rgba(var(--nav-active), 1);
-            line-height: 1.35;
+        .nav-steps-toggle {
+            width: 32px; height: 32px;
+            margin-left: 8px;
+            flex-shrink: 0;
+            border-radius: 50%;
+            border: 1px solid rgba(255,255,255,0.1);
+            background: rgba(255,255,255,0.04);
+            cursor: pointer;
+            display: flex; align-items: center; justify-content: center;
+            transition: background 0.2s ease, transform 0.3s ease;
+        }
+        .nav-steps-toggle:hover { background: rgba(255,255,255,0.1); }
+        .nav-steps-toggle svg {
+            width: 14px; height: 14px;
+            fill: none;
+            stroke: rgba(255,255,255,0.6);
+            stroke-width: 2;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+        }
+        .nav-bottom.expanded .nav-steps-toggle {
+            transform: rotate(180deg);
         }
 
-        .nav-current-detail {
+        .nav-steps-sheet {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.32s cubic-bezier(0.4, 0, 0.2, 1);
+            border-top: 1px solid rgba(255,255,255,0.06);
+        }
+        .nav-bottom.expanded .nav-steps-sheet {
+            max-height: 320px;
+        }
+
+        .nav-steps-sheet-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px 16px 8px;
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 1.6px;
+            color: rgba(var(--nav-accent), 0.7);
+        }
+        .nav-steps-sheet-header span:nth-child(2) {
+            color: rgba(255,255,255,0.4);
+            text-transform: none;
+            letter-spacing: 0;
             font-size: 11px;
-            color: var(--text-muted);
-            margin-top: 4px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 60%;
         }
 
-        /* --- STEP LIST --- */
         .nav-steps {
-            flex: 1;
+            max-height: 260px;
             overflow-y: auto;
-            padding: 4px 0;
-            width: var(--nav-width);
+            padding: 4px 0 8px;
         }
-
         .nav-steps::-webkit-scrollbar { width: 3px; }
         .nav-steps::-webkit-scrollbar-track { background: transparent; }
         .nav-steps::-webkit-scrollbar-thumb {
-            background: rgba(255, 255, 255, 0.08);
+            background: rgba(255,255,255,0.08);
             border-radius: 2px;
         }
 
@@ -252,59 +503,50 @@
             display: flex;
             align-items: flex-start;
             gap: 12px;
-            padding: 12px 20px;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.03);
-            transition: background 0.2s ease;
+            padding: 10px 16px;
+            border-bottom: 1px solid rgba(255,255,255,0.03);
         }
+        .nav-step:last-child { border-bottom: none; }
+        .nav-step.current-step { background: rgba(var(--nav-active), 0.06); }
 
-        .nav-step.current-step {
-            background: rgba(var(--nav-active), 0.05);
-        }
-
-        .nav-step-num {
-            width: 22px;
-            height: 22px;
-            border-radius: 50%;
+        .nav-step-icon {
+            width: 28px; height: 28px;
+            flex-shrink: 0;
+            border-radius: 8px;
             background: rgba(var(--nav-accent), 0.1);
             border: 1px solid rgba(var(--nav-accent), 0.2);
-            color: rgba(var(--nav-accent), 0.8);
-            font-size: 10px;
-            font-weight: 600;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            flex-shrink: 0;
+            display: flex; align-items: center; justify-content: center;
             margin-top: 1px;
         }
-
-        .nav-step.current-step .nav-step-num {
+        .nav-step-icon svg {
+            width: 18px; height: 18px;
+            fill: none;
+            stroke: rgba(var(--nav-accent), 0.85);
+            stroke-width: 2;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+        }
+        .nav-step.current-step .nav-step-icon {
             background: rgba(var(--nav-active), 0.2);
             border-color: rgba(var(--nav-active), 0.4);
-            color: rgba(var(--nav-active), 1);
+        }
+        .nav-step.current-step .nav-step-icon svg {
+            stroke: rgba(var(--nav-active), 1);
         }
 
         .nav-step-body { flex: 1; min-width: 0; }
-
         .nav-step-instruction {
             font-size: 12px;
-            color: rgba(255, 255, 255, 0.7);
-            line-height: 1.45;
+            color: rgba(255,255,255,0.75);
+            line-height: 1.4;
         }
-
         .nav-step.current-step .nav-step-instruction {
-            color: rgba(255, 255, 255, 0.95);
+            color: rgba(255,255,255,0.95);
         }
-
         .nav-step-meta {
             font-size: 10px;
             color: var(--text-muted);
             margin-top: 2px;
-        }
-
-        .nav-step-destination .nav-step-num {
-            background: rgba(var(--nav-active), 0.2);
-            border-color: rgba(var(--nav-active), 0.4);
-            color: rgba(var(--nav-active), 1);
         }
 
         /* --- CENTER PANEL: Voice Assistant (always centered) --- */
@@ -425,6 +667,8 @@
             transform: translate(-50%, -50%);
             z-index: 10;
             pointer-events: none;
+            max-width: 100%;
+            max-height: 100%;
         }
 
         .heading-area { text-align: center; }
@@ -512,6 +756,52 @@
             height: 100%; color: rgba(255,255,255,0.12);
             font-size: 13px; font-style: italic; letter-spacing: 0.5px;
         }
+
+        .chat-input {
+            display: flex; align-items: center; gap: 6px;
+            height: 42px;
+            width: 120px;
+            padding: 0 12px;
+            border-radius: 21px;
+            border: 1px solid var(--glass-border);
+            background: var(--glass);
+            backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+            transition: width 0.25s ease, background 0.2s ease, border-color 0.2s ease;
+            overflow: hidden;
+            flex-shrink: 0;
+        }
+        .chat-input:focus-within,
+        .chat-input.expanded {
+            width: 360px;
+            background: rgba(255,255,255,0.06);
+            border-color: rgba(var(--state-color), 0.35);
+        }
+        .chat-input .chat-input-icon {
+            width: 16px; height: 16px; flex-shrink: 0;
+            fill: none; stroke: rgba(255,255,255,0.55);
+            stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round;
+        }
+        .chat-input textarea {
+            flex: 1; min-width: 0;
+            background: transparent; border: none; outline: none;
+            color: rgba(255,255,255,0.92);
+            font: inherit; font-size: 13px; line-height: 1.4;
+            padding: 0; margin: 0;
+            resize: none;
+            height: 20px; max-height: 80px;
+            /* Hide overflow while collapsed so the wrapped placeholder
+               ("Type a message…") doesn't show a vertical scrollbar in the
+               narrow 120px state. Restore auto-scroll once the input is
+               focused/expanded and can grow up to max-height. */
+            overflow: hidden;
+        }
+        .chat-input:focus-within textarea,
+        .chat-input.expanded textarea {
+            overflow-y: auto;
+        }
+        .chat-input textarea::placeholder { color: rgba(255,255,255,0.4); }
+        .chat-input textarea:disabled { opacity: 0.5; cursor: not-allowed; }
+        .chat-input.disabled { opacity: 0.5; }
 
         .message {
             max-width: 88%; opacity: 0; transform: translateY(12px);
@@ -680,20 +970,84 @@
             line-height: 1.4;
         }
 
-        /* --- CONTROLS BAR --- */
+        /* --- MUSIC CONTROLS --- */
+        .music-controls {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 14px;
+            padding: 6px 20px 18px;
+            flex-shrink: 0;
+        }
+        .music-ctl {
+            width: 36px; height: 36px;
+            border-radius: 50%;
+            border: 1px solid var(--glass-border);
+            background: rgba(255,255,255,0.04);
+            color: rgba(255,255,255,0.85);
+            cursor: pointer;
+            display: flex; align-items: center; justify-content: center;
+            transition: background 0.15s ease, transform 0.1s ease, opacity 0.2s ease;
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+        }
+        .music-ctl svg {
+            width: 14px; height: 14px;
+            fill: currentColor;
+            stroke: currentColor;
+            stroke-width: 1.5;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+        }
+        .music-ctl:hover { background: rgba(255,255,255,0.1); }
+        .music-ctl:active { transform: scale(0.92); }
+        .music-ctl:disabled { opacity: 0.35; cursor: not-allowed; }
+
+        .music-ctl-primary {
+            width: 46px; height: 46px;
+            background: rgba(var(--music-accent), 0.18);
+            border-color: rgba(var(--music-accent), 0.4);
+            color: rgba(var(--music-accent), 1);
+        }
+        .music-ctl-primary:hover {
+            background: rgba(var(--music-accent), 0.3);
+        }
+        .music-ctl-primary svg { width: 18px; height: 18px; }
+
+        /* Paused state: dim the EQ animation and let it freeze. */
+        .music-panel.paused .music-eq-overlay span {
+            animation-play-state: paused;
+            opacity: 0.35;
+        }
+
+        /* --- CONTROLS BAR ---
+           3-column grid: side chips can't overlap the centered cluster
+           because each lives in its own column, and 1fr / auto / 1fr keeps
+           the center true-centered regardless of side widths. */
         .controls-bar {
             position: relative; z-index: 10;
-            display: flex; align-items: center; justify-content: center;
+            display: grid;
+            grid-template-columns: 1fr auto 1fr;
+            align-items: center;
             gap: 16px;
-            padding: 12px 24px max(20px, env(safe-area-inset-bottom));
+            padding: 12px 24px calc(max(20px, env(safe-area-inset-bottom)) + var(--mobile-browser-bottom-guard));
             border-top: 1px solid var(--glass-border);
             background: rgba(255,255,255,0.01);
             flex-shrink: 0;
+            width: 100%;
+            min-width: 0;
+        }
+
+        .control-cluster {
+            display: flex; align-items: center; gap: 16px;
+            justify-self: center;
+            min-width: 0;
         }
 
         .vehicle-chips {
             display: flex; gap: 10px; align-items: center;
-            position: absolute; left: 24px;
+            justify-self: start;
+            min-width: 0;
         }
 
         .vehicle-chip {
@@ -701,6 +1055,8 @@
             padding: 6px 12px; border-radius: 20px;
             background: var(--glass); border: 1px solid var(--glass-border);
             font-size: 12px; color: rgba(255,255,255,0.5);
+            flex-shrink: 0;
+            white-space: nowrap;
         }
 
         .vehicle-chip svg {
@@ -709,7 +1065,63 @@
             stroke-linecap: round; stroke-linejoin: round; flex-shrink: 0;
         }
 
-        .vehicle-chip .chip-value { color: rgba(255,255,255,0.8); font-weight: 500; }
+        /* Chips that double as panel toggles get an accent when their panel
+           is open. Color comes from a per-chip --chip-accent so location can
+           tint nav-green and music can tint music-pink. */
+        .vehicle-chip[role="button"] {
+            cursor: pointer;
+            transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease, transform 0.15s ease;
+        }
+        .vehicle-chip[role="button"]:hover {
+            background: rgba(255,255,255,0.07);
+            border-color: rgba(255,255,255,0.14);
+        }
+        .vehicle-chip[role="button"]:active {
+            transform: scale(0.97);
+        }
+        /* Suppress the mouse-click focus ring (which was making the chip stay
+           "highlighted" after a click). Keyboard users still get a visible
+           focus indicator via :focus-visible. */
+        .vehicle-chip[role="button"]:focus { outline: none; }
+        .vehicle-chip[role="button"]:focus-visible {
+            outline: 2px solid rgba(var(--chip-accent, 255,255,255), 0.7);
+            outline-offset: 2px;
+        }
+        .vehicle-chip.toggle-active {
+            background: rgba(var(--chip-accent, 255,255,255), 0.14);
+            border-color: rgba(var(--chip-accent, 255,255,255), 0.45);
+            color: rgba(255,255,255,0.95);
+            box-shadow: 0 0 14px rgba(var(--chip-accent, 255,255,255), 0.18);
+        }
+        .vehicle-chip.toggle-active svg {
+            stroke: rgba(var(--chip-accent, 255,255,255), 1);
+        }
+        .vehicle-chip.toggle-active .chip-value {
+            color: rgba(255,255,255,0.98);
+        }
+        #chip-location { --chip-accent: var(--nav-accent); }
+        #chip-music    { --chip-accent: var(--music-accent); }
+        /* Music chip: keep label compact, fade subtitle when no track. */
+        #chip-music .chip-value {
+            max-width: 140px;
+            overflow: hidden; text-overflow: ellipsis;
+        }
+        /* Idle music chip is icon-only — hide the empty label span. Give the
+           chip a min-width so it doesn't shrink to a tiny circle when there's
+           no track text; aim for the same visual weight as the other chips. */
+        #chip-music.empty .chip-value { display: none; }
+        #chip-music.empty {
+            min-width: 70px;
+            justify-content: center;
+        }
+        #chip-music.empty svg { width: 16px; height: 16px; }
+
+        .vehicle-chip .chip-value {
+            color: rgba(255,255,255,0.8); font-weight: 500;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 120px;
+        }
 
         #btn-talk {
             display: flex; align-items: center; gap: 8px;
@@ -719,7 +1131,10 @@
             cursor: pointer; backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
             transition: all 0.2s ease; letter-spacing: 0.3px;
             user-select: none; -webkit-user-select: none;
+            white-space: nowrap;
+            flex-shrink: 0;
         }
+        #btn-talk-label { white-space: nowrap; }
         #btn-talk svg {
             width: 16px; height: 16px; fill: none;
             stroke: rgba(255,255,255,0.7); stroke-width: 1.8;
@@ -728,18 +1143,17 @@
         #btn-talk:hover { background: rgba(255,255,255,0.08); transform: translateY(-1px); box-shadow: 0 4px 20px rgba(0,0,0,0.3); }
         #btn-talk:active { transform: scale(0.97); }
         #btn-talk:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
-
-        #btn-stop {
-            width: 42px; height: 42px; border-radius: 50%;
-            border: 1px solid rgba(255,80,80,0.25); background: rgba(255,50,50,0.12);
-            color: #ff8888; cursor: pointer; display: none;
-            align-items: center; justify-content: center;
-            backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
-            transition: all 0.2s ease;
+        #btn-talk.interrupting {
+            border-color: rgba(255,80,80,0.32);
+            background: rgba(255,50,50,0.14);
+            color: #ffaaaa;
         }
-        #btn-stop svg { width: 14px; height: 14px; fill: #ff9999; }
-        #btn-stop:hover { background: rgba(255,50,50,0.25); transform: translateY(-1px); }
-        #btn-stop:active { transform: scale(0.95); }
+        #btn-talk.interrupting svg {
+            stroke: #ff9999;
+        }
+        #btn-talk.interrupting:hover {
+            background: rgba(255,50,50,0.25);
+        }
 
         #btn-clear {
             width: 42px; height: 42px; border-radius: 50%;
@@ -761,7 +1175,8 @@
         /* --- CLIMATE WIDGET --- */
         .right-chips {
             display: flex; gap: 10px; align-items: center;
-            position: absolute; right: 24px;
+            justify-self: end;
+            min-width: 0;
         }
 
         .climate-widget {
@@ -769,6 +1184,8 @@
             padding: 6px 12px; border-radius: 20px;
             background: var(--glass); border: 1px solid var(--glass-border);
             font-size: 12px; color: rgba(255,255,255,0.5);
+            flex-shrink: 0;
+            white-space: nowrap;
         }
         .climate-widget.active { display: flex; }
 
@@ -807,43 +1224,1115 @@
         .clock-area {
             font-size: 13px; color: rgba(255,255,255,0.4);
             font-weight: 400; font-variant-numeric: tabular-nums;
+            flex-shrink: 0;
+            white-space: nowrap;
         }
 
-        /* --- VOICE SELECTOR --- */
-        .voice-selector {
-            display: flex; align-items: center; gap: 6px;
-            padding: 6px 12px; border-radius: 20px;
-            background: var(--glass); border: 1px solid var(--glass-border);
-        }
-        .voice-selector svg {
-            width: 13px; height: 13px; fill: none;
-            stroke: rgba(255,255,255,0.4); stroke-width: 1.5;
-            stroke-linecap: round; stroke-linejoin: round; flex-shrink: 0;
-        }
-        .voice-selector select {
-            background: transparent; border: none; outline: none;
-            color: rgba(255,255,255,0.7); font-size: 11px;
-            font-family: inherit; cursor: pointer;
-            -webkit-appearance: none; appearance: none;
-            padding-right: 12px;
-            max-width: 180px;
-        }
-        .voice-selector select option {
-            background: #1a1a24; color: rgba(255,255,255,0.85);
-        }
-        .voice-selector::after {
-            content: '';
-            position: absolute; right: 10px; top: 50%;
-            transform: translateY(-50%);
-            border-left: 3px solid transparent;
-            border-right: 3px solid transparent;
-            border-top: 4px solid rgba(255,255,255,0.3);
+        .chip-popover {
+            position: absolute;
+            left: var(--popover-left, 48px);
+            bottom: calc(100% + 8px);
+            transform: translate(-50%, 6px);
+            z-index: 15;
+            min-width: 76px;
+            padding: 8px 10px;
+            border-radius: 14px;
+            border: 1px solid rgba(255,255,255,0.12);
+            background: rgba(18,18,24,0.9);
+            color: rgba(255,255,255,0.9);
+            box-shadow: 0 8px 24px rgba(0,0,0,0.35);
+            backdrop-filter: blur(18px);
+            -webkit-backdrop-filter: blur(18px);
             pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.16s ease, transform 0.16s ease;
+            text-align: center;
         }
+        .chip-popover.open {
+            opacity: 1;
+            transform: translate(-50%, 0);
+        }
+        .chip-popover-label {
+            display: block;
+            font-size: 8px;
+            letter-spacing: 1.2px;
+            text-transform: uppercase;
+            color: rgba(255,255,255,0.4);
+            line-height: 1;
+        }
+        .chip-popover-value {
+            display: block;
+            margin-top: 4px;
+            font-size: 15px;
+            font-weight: 600;
+            line-height: 1;
+            font-variant-numeric: tabular-nums;
+        }
+
+
+
+        /* --- RESPONSIVE: TABLET (≤ 900px) -------------------------------
+           Tighten side panels and shrink the orb/headings. Buttons collapse
+           to icon-only (no text labels) so the bottom bar stays uncluttered. */
+        @media (max-width: 900px) {
+            :root { --nav-width: 360px; --music-width: 280px; }
+            .orb-wrapper { width: 220px; height: 220px; }
+            .orb { width: 110px; height: 110px; }
+            .ambient-glow { width: 460px; height: 460px; }
+            h1 { font-size: 18px; }
+            h2 { font-size: 24px; }
+            .top-section { padding-top: 2.5vh; }
+            .chat-section { max-width: 480px; padding: 0 12px; margin-top: 4px; }
+            .controls-bar { padding: 10px 16px calc(max(16px, env(safe-area-inset-bottom)) + var(--mobile-browser-bottom-guard)); gap: 12px; }
+            .vehicle-chips, .right-chips { gap: 8px; }
+            .control-cluster { gap: 10px; }
+
+            /* Icon-only mode: hide labels on the talk button + clock. Chip
+               values stay in the DOM but collapse to zero width — tap or
+               hover the chip to reveal them. */
+            #btn-talk-label,
+            .clock-area { display: none; }
+            #btn-talk { padding: 10px 14px; }
+
+            .vehicle-chip {
+                padding: 8px;
+                cursor: pointer;
+                outline: none;
+                transition: padding 0.2s ease, background 0.2s ease, border-color 0.2s ease;
+            }
+            .vehicle-chip:hover,
+            .vehicle-chip:focus,
+            .vehicle-chip.revealed {
+                padding: 6px 12px;
+                background: rgba(255,255,255,0.08);
+                border-color: rgba(255,255,255,0.15);
+            }
+            /* Chip value (location text / temp number) sits right after the SVG. */
+            .vehicle-chip .chip-value {
+                max-width: 0;
+                margin-left: 0;
+                overflow: hidden;
+                white-space: nowrap;
+                transition: max-width 0.25s ease, margin-left 0.25s ease;
+            }
+            .vehicle-chip:hover .chip-value,
+            .vehicle-chip:focus .chip-value,
+            .vehicle-chip.revealed .chip-value {
+                max-width: 140px;
+                margin-left: 6px;
+            }
+            /* Temp unit (°F) sits flush against the temp value with no gap. */
+            #chip-temp-unit {
+                max-width: 0;
+                overflow: hidden;
+                white-space: nowrap;
+                transition: max-width 0.25s ease;
+            }
+            #chip-temp:hover #chip-temp-unit,
+            #chip-temp:focus #chip-temp-unit,
+            #chip-temp.revealed #chip-temp-unit {
+                max-width: 30px;
+            }
+
+            /* Chat input collapses to an icon button; expands on focus.
+               The textarea stays in the DOM (just collapsed to zero width)
+               so the click-to-focus handler still works. */
+            .chat-input { width: 42px; padding: 0; justify-content: center; gap: 0; }
+            .chat-input textarea {
+                flex: 0 0 0;
+                width: 0;
+                opacity: 0;
+                transition: opacity 0.15s ease 0.1s;
+            }
+            .chat-input:focus-within,
+            .chat-input.expanded {
+                width: 280px;
+                padding: 0 12px;
+                justify-content: flex-start;
+                gap: 6px;
+            }
+            .chat-input:focus-within textarea,
+            .chat-input.expanded textarea {
+                flex: 1;
+                width: auto;
+                opacity: 1;
+            }
+        }
+
+        /* --- RESPONSIVE: PHONE (≤ 640px) --------------------------------
+           Side panels become near-full-screen overlays. Inherits icon-only
+           buttons from the tablet breakpoint above and drops secondary
+           chips so the row stays tight. */
+        @media (max-width: 640px) {
+            .nav-panel   { width: min(var(--nav-width), 100vw); }
+            .music-panel { width: min(var(--music-width), 92vw); }
+            .music-art-container,
+            .music-header { width: 100%; }
+            .panel-collapse { width: 44px; height: 44px; }
+            .nav-panel .panel-collapse { right: max(10px, env(safe-area-inset-right)); }
+            .music-panel .panel-collapse { left: max(10px, env(safe-area-inset-left)); }
+
+            .brand-wordmark { top: calc(14px + var(--mobile-browser-top-guard)); }
+            .brand-text     { font-size: 11px; letter-spacing: 0.32em; }
+
+            .orb-wrapper { width: 210px; height: 210px; }
+            .orb { width: 108px; height: 108px; }
+            .ambient-glow { width: 390px; height: 390px; }
+            h1 { font-size: 13px; }
+            h2 { font-size: 20px; }
+            .heading-area { margin-top: -6px; }
+            .top-section {
+                padding-top: max(
+                    calc(44px + var(--mobile-browser-top-guard)),
+                    calc(env(safe-area-inset-top) + 28px + var(--mobile-browser-top-guard))
+                );
+            }
+            .chat-section { padding: 0 10px; margin-top: 0; }
+            .chat-scroll { padding-top: 8px; }
+
+            .controls-bar {
+                --mobile-dock-width: min(292px, calc(100vw - 24px));
+                display: grid;
+                grid-template-columns: 36px 36px 58px 36px 36px;
+                justify-content: center;
+                justify-items: center;
+                align-items: center;
+                column-gap: 9px;
+                row-gap: 0;
+                padding:
+                    8px
+                    max(12px, env(safe-area-inset-right))
+                    calc(4px + min(env(safe-area-inset-bottom), 6px) + var(--mobile-dock-bottom-guard))
+                    max(12px, env(safe-area-inset-left));
+            }
+            .controls-bar::before {
+                content: "";
+                position: absolute;
+                left: 50%;
+                top: 8px;
+                width: var(--mobile-dock-width);
+                height: 56px;
+                transform: translateX(-50%);
+                border-radius: 999px;
+                border: 1px solid rgba(255,255,255,0.075);
+                background:
+                    linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0.018));
+                box-shadow:
+                    inset 0 1px 0 rgba(255,255,255,0.05),
+                    0 10px 28px rgba(0,0,0,0.34);
+                pointer-events: none;
+            }
+            .vehicle-chips,
+            .control-cluster,
+            .right-chips {
+                display: contents;
+            }
+            #chip-temp {
+                grid-column: 1;
+                grid-row: 1;
+            }
+            #chip-location {
+                grid-column: 2;
+                grid-row: 1;
+            }
+            #btn-talk {
+                grid-column: 3;
+                grid-row: 1;
+            }
+            .chat-input {
+                grid-column: 4;
+                grid-row: 1;
+            }
+            .controls-bar #btn-settings {
+                grid-column: 5;
+                grid-row: 1;
+            }
+            #chip-temp,
+            #chip-location,
+            #btn-talk,
+            .chat-input,
+            .controls-bar #btn-settings {
+                align-self: center;
+            }
+            .controls-bar > *:not(.chip-popover),
+            .vehicle-chips > *,
+            .control-cluster > *,
+            .right-chips > * {
+                position: relative;
+                z-index: 1;
+            }
+            .vehicle-chip:hover,
+            .vehicle-chip:focus,
+            .vehicle-chip.revealed {
+                padding: 0;
+            }
+            .vehicle-chip:hover .chip-value,
+            .vehicle-chip:focus .chip-value,
+            .vehicle-chip.revealed .chip-value,
+            #chip-temp:hover #chip-temp-unit,
+            #chip-temp:focus #chip-temp-unit,
+            #chip-temp.revealed #chip-temp-unit {
+                max-width: 0;
+                margin-left: 0;
+            }
+            #chip-temp,
+            #chip-location {
+                width: 36px;
+                min-width: 36px;
+                height: 36px;
+                padding: 0;
+                justify-content: center;
+            }
+            #chip-temp .chip-value,
+            #chip-temp-unit,
+            #chip-location .chip-value {
+                display: none;
+            }
+            #chip-music { display: none !important; }
+            /* Drop secondary widgets on a phone; the bottom bar stays icon-only. */
+            .climate-widget { display: none !important; }
+            .clock-area { display: none !important; }
+
+            .chat-input {
+                width: 38px;
+                min-width: 38px;
+                height: 38px;
+            }
+            #btn-talk {
+                position: relative;
+                isolation: isolate;
+                width: 58px;
+                min-width: 58px;
+                height: 58px;
+                margin: 0;
+                padding: 0;
+                border: 1px solid rgba(216,200,255,0.28);
+                border-radius: 50%;
+                justify-content: center;
+                background:
+                    radial-gradient(circle at 35% 28%, rgba(255,255,255,0.32), transparent 16%),
+                    linear-gradient(180deg, rgba(171,118,255,0.98), rgba(103,77,218,0.98));
+                box-shadow:
+                    inset 0 1px 0 rgba(255,255,255,0.28),
+                    inset 0 -12px 24px rgba(43,23,96,0.24),
+                    0 8px 20px rgba(0,0,0,0.42),
+                    0 0 20px rgba(139,92,246,0.24);
+                overflow: visible;
+                transform: none;
+            }
+            #btn-talk::before,
+            #btn-talk::after {
+                display: none;
+            }
+            #btn-talk svg {
+                position: relative;
+                z-index: 1;
+                width: 21px;
+                height: 21px;
+                stroke: rgba(255,255,255,0.94);
+                stroke-width: 2;
+                filter: drop-shadow(0 1px 5px rgba(0,0,0,0.22));
+            }
+            #btn-talk-label {
+                position: absolute;
+                width: 1px;
+                height: 1px;
+                overflow: hidden;
+                clip: rect(0, 0, 0, 0);
+                white-space: nowrap;
+            }
+            #btn-talk:hover {
+                background:
+                    radial-gradient(circle at 35% 28%, rgba(255,255,255,0.34), transparent 16%),
+                    linear-gradient(180deg, rgba(178,128,255,1), rgba(110,82,226,1));
+                transform: translateY(-1px);
+                box-shadow:
+                    inset 0 1px 0 rgba(255,255,255,0.3),
+                    inset 0 -12px 24px rgba(43,23,96,0.22),
+                    0 9px 22px rgba(0,0,0,0.44),
+                    0 0 22px rgba(139,92,246,0.28);
+            }
+            #btn-talk:active {
+                transform: scale(0.97);
+            }
+            #btn-talk.interrupting {
+                border-color: rgba(255,178,196,0.34);
+                background:
+                    radial-gradient(circle at 35% 28%, rgba(255,255,255,0.28), transparent 16%),
+                    linear-gradient(180deg, rgba(255,105,146,0.98), rgba(176,43,92,0.98));
+                box-shadow:
+                    inset 0 1px 0 rgba(255,255,255,0.24),
+                    inset 0 -12px 24px rgba(78,8,35,0.24),
+                    0 8px 20px rgba(0,0,0,0.42),
+                    0 0 20px rgba(255,79,143,0.28);
+            }
+            #btn-talk.interrupting svg {
+                stroke: rgba(255,255,255,0.96);
+            }
+            .controls-bar #btn-clear {
+                display: none;
+            }
+            .controls-bar #btn-settings {
+                width: 36px;
+                min-width: 36px;
+                height: 36px;
+            }
+
+            .chat-input:focus-within,
+            .chat-input.expanded { width: 42px; }
+            .controls-bar.chat-focused {
+                display: flex;
+                justify-content: center;
+            }
+            .controls-bar.chat-focused .vehicle-chips,
+            .controls-bar.chat-focused .right-chips {
+                display: none;
+            }
+            .controls-bar.chat-focused .control-cluster {
+                display: flex;
+                width: min(calc(100vw - 24px), 370px);
+                justify-content: center;
+                align-items: center;
+                gap: 10px;
+            }
+            .controls-bar.chat-focused #btn-clear {
+                display: none;
+            }
+            .controls-bar.chat-focused .chat-input:focus-within,
+            .controls-bar.chat-focused .chat-input.expanded {
+                width: min(246px, calc(100vw - 128px));
+                box-sizing: border-box;
+                padding: 0 12px;
+                justify-content: flex-start;
+                gap: 6px;
+            }
+            .controls-bar.chat-focused .chat-input:focus-within textarea,
+            .controls-bar.chat-focused .chat-input.expanded textarea {
+                flex: 1;
+                width: auto;
+                opacity: 1;
+            }
+            .controls-bar.chat-focused #btn-talk {
+                width: 50px;
+                min-width: 50px;
+                height: 50px;
+                margin: 0;
+                transform: none;
+            }
+            .controls-bar.chat-focused #btn-talk:hover {
+                transform: translateY(-1px);
+            }
+            .controls-bar.chat-focused #btn-talk:active {
+                transform: scale(0.96);
+            }
+            .controls-bar.chat-focused #btn-talk svg {
+                width: 18px;
+                height: 18px;
+            }
+
+            .chip-popover {
+                min-width: 68px;
+                padding: 7px 9px;
+                bottom: calc(100% + 7px);
+            }
+            .chip-popover-value { font-size: 14px; }
+        }
+
+        /* --- RESPONSIVE: SMALL PHONE (≤ 420px) -------------------------- */
+        @media (max-width: 420px) {
+            .controls-bar {
+                gap: 6px;
+                padding-top: 8px;
+            }
+            .right-chips .clock-area,
+            .right-chips .climate-widget {
+                display: none !important;
+            }
+            .vehicle-chips,
+            .right-chips {
+                gap: 4px;
+            }
+            .control-cluster {
+                display: contents;
+            }
+            #chip-temp,
+            #chip-location {
+                width: 36px;
+                min-width: 36px;
+                height: 36px;
+                padding: 0;
+                justify-content: center;
+            }
+            .chat-input,
+            #btn-clear,
+            .controls-bar #btn-settings {
+                width: 36px;
+                min-width: 36px;
+                height: 36px;
+            }
+            #btn-talk {
+                width: 58px;
+                min-width: 58px;
+                height: 58px;
+                margin: 0;
+                padding: 0;
+                justify-content: center;
+            }
+
+            .chat-input:focus-within,
+            .chat-input.expanded { width: 42px; }
+            .controls-bar.chat-focused .chat-input:focus-within,
+            .controls-bar.chat-focused .chat-input.expanded {
+                width: min(246px, calc(100vw - 128px));
+            }
+            .controls-bar.chat-focused #btn-talk {
+                width: 50px;
+                min-width: 50px;
+                height: 50px;
+                margin: 0;
+            }
+
+            .orb-wrapper { width: 190px; height: 190px; }
+            .orb { width: 98px; height: 98px; }
+            h1 { font-size: 12px; }
+            h2 { font-size: 18px; }
+        }
+
+        /* --- RESPONSIVE: SHORT VIEWPORTS (landscape phones) -------------- */
+        @media (max-height: 480px) {
+            .orb-wrapper { width: 140px; height: 140px; }
+            .orb { width: 72px; height: 72px; }
+            .ambient-glow { width: 320px; height: 320px; }
+            .top-section { padding-top: max(0.5vh, calc(var(--mobile-browser-top-guard) + 2px)); }
+            h1 { font-size: 14px; }
+            h2 { font-size: 18px; }
+            .brand-wordmark { top: calc(8px + var(--mobile-browser-top-guard)); }
+            .chat-section { margin-top: 2px; }
+            .controls-bar {
+                --mobile-dock-width: min(294px, calc(100vw - 24px));
+                display: grid;
+                grid-template-columns: 38px 38px 52px 38px 38px;
+                justify-content: center;
+                justify-items: center;
+                align-items: center;
+                column-gap: 10px;
+                row-gap: 0;
+                padding-top: 8px;
+                padding-bottom: calc(4px + min(env(safe-area-inset-bottom), 6px) + var(--mobile-dock-bottom-guard));
+            }
+            .controls-bar::before {
+                content: "";
+                position: absolute;
+                left: 50%;
+                top: 8px;
+                width: var(--mobile-dock-width);
+                height: 48px;
+                transform: translateX(-50%);
+                border-radius: 999px;
+                border: 1px solid rgba(255,255,255,0.08);
+                background:
+                    linear-gradient(180deg, rgba(255,255,255,0.045), rgba(255,255,255,0.018));
+                box-shadow:
+                    inset 0 1px 0 rgba(255,255,255,0.05),
+                    0 10px 28px rgba(0,0,0,0.3);
+                pointer-events: none;
+            }
+            .vehicle-chip,
+            .chat-input,
+            #btn-clear,
+            .controls-bar #btn-settings {
+                width: 38px;
+                min-width: 38px;
+                height: 38px;
+            }
+            #btn-talk {
+                position: relative;
+                isolation: isolate;
+                width: 52px;
+                min-width: 52px;
+                height: 52px;
+                margin-top: 0;
+                padding: 0;
+                border: 1px solid rgba(216,200,255,0.28);
+                border-radius: 50%;
+                justify-content: center;
+                background:
+                    radial-gradient(circle at 35% 28%, rgba(255,255,255,0.3), transparent 16%),
+                    linear-gradient(180deg, rgba(171,118,255,0.98), rgba(103,77,218,0.98));
+                box-shadow:
+                    inset 0 1px 0 rgba(255,255,255,0.26),
+                    inset 0 -10px 20px rgba(43,23,96,0.22),
+                    0 7px 18px rgba(0,0,0,0.42),
+                    0 0 18px rgba(139,92,246,0.23);
+                overflow: visible;
+                transform: none;
+            }
+            #btn-talk svg {
+                position: relative;
+                z-index: 1;
+                width: 20px;
+                height: 20px;
+                stroke: rgba(255,255,255,0.94);
+                filter: drop-shadow(0 0 8px rgba(255,255,255,0.2));
+            }
+            #btn-talk::before,
+            #btn-talk::after {
+                display: none;
+            }
+            #btn-talk:hover {
+                transform: translateY(-1px);
+                background:
+                    radial-gradient(circle at 35% 28%, rgba(255,255,255,0.34), transparent 16%),
+                    linear-gradient(180deg, rgba(178,128,255,1), rgba(110,82,226,1));
+            }
+            #btn-talk:active {
+                transform: scale(0.97);
+            }
+            #btn-talk.interrupting {
+                border-color: rgba(255,178,196,0.34);
+                background:
+                    radial-gradient(circle at 35% 28%, rgba(255,255,255,0.28), transparent 16%),
+                    linear-gradient(180deg, rgba(255,105,146,0.98), rgba(176,43,92,0.98));
+                box-shadow:
+                    inset 0 1px 0 rgba(255,255,255,0.24),
+                    inset 0 -10px 20px rgba(78,8,35,0.24),
+                    0 7px 18px rgba(0,0,0,0.42),
+                    0 0 18px rgba(255,79,143,0.26);
+            }
+        }
+
+        @media (max-height: 480px) and (max-width: 960px) {
+            .controls-bar {
+                display: grid;
+                grid-template-columns: 38px 38px 52px 38px 38px;
+                justify-content: center;
+                justify-items: center;
+                align-items: center;
+                column-gap: 10px;
+                row-gap: 0;
+                padding-left: max(10px, env(safe-area-inset-left));
+                padding-right: max(10px, env(safe-area-inset-right));
+            }
+            .vehicle-chips,
+            .control-cluster,
+            .right-chips {
+                display: contents;
+            }
+            #chip-temp {
+                grid-column: 1;
+                grid-row: 1;
+            }
+            #chip-location {
+                grid-column: 2;
+                grid-row: 1;
+            }
+            #btn-talk {
+                grid-column: 3;
+                grid-row: 1;
+            }
+            .chat-input {
+                grid-column: 4;
+                grid-row: 1;
+            }
+            .controls-bar #btn-settings {
+                grid-column: 5;
+                grid-row: 1;
+            }
+            #chip-temp,
+            #chip-location,
+            #btn-talk,
+            .chat-input,
+            .controls-bar #btn-settings {
+                align-self: center;
+            }
+            .controls-bar > *:not(.chip-popover),
+            .vehicle-chips > *,
+            .control-cluster > *,
+            .right-chips > * {
+                position: relative;
+                z-index: 1;
+            }
+            .vehicle-chip {
+                padding: 0;
+                justify-content: center;
+            }
+            .vehicle-chip .chip-value,
+            #chip-temp-unit,
+            #btn-talk-label,
+            .clock-area {
+                display: none;
+            }
+            #chip-music,
+            .climate-widget {
+                display: none !important;
+            }
+            .chat-input {
+                padding: 0;
+                justify-content: center;
+                gap: 0;
+            }
+            .controls-bar #btn-clear {
+                display: none;
+            }
+            .chat-input textarea {
+                flex: 0 0 0;
+                width: 0;
+                opacity: 0;
+            }
+            .controls-bar.chat-focused {
+                display: flex;
+                justify-content: center;
+            }
+            .controls-bar.chat-focused .vehicle-chips,
+            .controls-bar.chat-focused .right-chips {
+                display: none;
+            }
+            .controls-bar.chat-focused .control-cluster {
+                display: flex;
+                width: 100%;
+                justify-content: center;
+                align-items: center;
+                gap: 9px;
+            }
+            .controls-bar.chat-focused #btn-clear {
+                display: none;
+            }
+            .controls-bar.chat-focused .chat-input:focus-within,
+            .controls-bar.chat-focused .chat-input.expanded {
+                width: min(360px, calc(100% - 62px));
+                padding: 0 12px;
+                justify-content: flex-start;
+                gap: 6px;
+            }
+            .controls-bar.chat-focused .chat-input:focus-within textarea,
+            .controls-bar.chat-focused .chat-input.expanded textarea {
+                flex: 1;
+                width: auto;
+                opacity: 1;
+            }
+            .controls-bar.chat-focused #btn-talk {
+                width: 50px;
+                min-width: 50px;
+                height: 50px;
+                margin: 0;
+                transform: none;
+            }
+            .controls-bar.chat-focused #btn-talk svg {
+                width: 17px;
+                height: 17px;
+            }
+        }
+
+        /* --- SETTINGS BUTTON --- */
+        #btn-settings {
+            width: 42px; height: 42px; border-radius: 50%;
+            border: 1px solid var(--glass-border); background: var(--glass);
+            color: rgba(255,255,255,0.5); cursor: pointer;
+            display: flex; align-items: center; justify-content: center;
+            backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+            transition: all 0.2s ease;
+            position: relative;
+        }
+        #btn-settings svg {
+            width: 16px; height: 16px; fill: none;
+            stroke: rgba(255,255,255,0.4); stroke-width: 1.8;
+            stroke-linecap: round; stroke-linejoin: round;
+            transition: transform 0.4s ease, stroke 0.2s ease;
+        }
+        #btn-settings:hover { background: rgba(255,255,255,0.08); transform: translateY(-1px); }
+        #btn-settings:hover svg { stroke: rgba(255,255,255,0.85); transform: rotate(45deg); }
+        #btn-settings:active { transform: scale(0.95); }
+        #btn-settings.active {
+            background: rgba(var(--state-color), 0.18);
+            border-color: rgba(var(--state-color), 0.4);
+        }
+        #btn-settings.active svg { stroke: rgba(var(--state-color), 1); transform: rotate(45deg); }
+        #btn-settings .mode-pip {
+            position: absolute;
+            top: 5px; right: 5px;
+            width: 7px; height: 7px;
+            border-radius: 50%;
+            background: rgba(var(--state-color), 0.95);
+            box-shadow: 0 0 6px rgba(var(--state-color), 0.85);
+            opacity: 0;
+            transition: opacity 0.25s ease;
+        }
+        body[data-mode="dev"] #btn-settings .mode-pip { opacity: 1; }
+
+        /* --- SETTINGS PANEL (slides up from bottom controls) --- */
+        .settings-overlay {
+            position: fixed;
+            inset: 0;
+            z-index: 90;
+            background: rgba(0, 0, 0, 0);
+            pointer-events: none;
+            transition: background 0.25s ease;
+        }
+        .settings-overlay.open {
+            background: rgba(0, 0, 0, 0.35);
+            pointer-events: auto;
+        }
+        .settings-panel {
+            position: fixed;
+            bottom: 88px;
+            left: 50%;
+            transform: translate(-50%, 12px);
+            width: min(440px, calc(100vw - 32px));
+            max-height: calc(100vh - 160px);
+            overflow-y: auto;
+            z-index: 91;
+            background: rgba(14, 14, 20, 0.96);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 18px;
+            backdrop-filter: blur(24px);
+            -webkit-backdrop-filter: blur(24px);
+            box-shadow: 0 18px 60px rgba(0,0,0,0.55), 0 0 30px rgba(var(--state-color), 0.12);
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.25s ease, transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .settings-overlay.open + .settings-panel,
+        .settings-panel.open {
+            opacity: 1;
+            pointer-events: auto;
+            transform: translate(-50%, 0);
+        }
+        .settings-panel-header {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 16px 20px 12px;
+            border-bottom: 1px solid rgba(255,255,255,0.06);
+        }
+        .settings-panel-title {
+            font-size: 11px; font-weight: 600;
+            text-transform: uppercase; letter-spacing: 2px;
+            color: rgba(255,255,255,0.85);
+        }
+        .settings-panel-close {
+            width: 26px; height: 26px; border-radius: 50%;
+            border: 1px solid var(--glass-border); background: rgba(255,255,255,0.04);
+            color: rgba(255,255,255,0.5); cursor: pointer;
+            display: flex; align-items: center; justify-content: center;
+            transition: background 0.2s ease, color 0.2s ease;
+        }
+        .settings-panel-close:hover { background: rgba(255,255,255,0.1); color: #fff; }
+        .settings-panel-close svg {
+            width: 12px; height: 12px; fill: none;
+            stroke: currentColor; stroke-width: 2;
+            stroke-linecap: round;
+        }
+        .settings-section {
+            padding: 14px 20px;
+            border-bottom: 1px solid rgba(255,255,255,0.04);
+        }
+        .settings-section:last-child { border-bottom: none; }
+        .settings-section-label {
+            font-size: 9px; font-weight: 600;
+            text-transform: uppercase; letter-spacing: 1.6px;
+            color: rgba(255,255,255,0.35);
+            margin-bottom: 10px;
+        }
+        .settings-row {
+            display: flex; align-items: center; justify-content: space-between;
+            gap: 12px; padding: 8px 0;
+        }
+        .settings-row-text { flex: 1; min-width: 0; }
+        .settings-row-title {
+            font-size: 13px; color: rgba(255,255,255,0.9);
+            margin-bottom: 2px;
+        }
+        .settings-row-hint {
+            font-size: 11px; color: rgba(255,255,255,0.45);
+            line-height: 1.4;
+        }
+
+        /* Segmented toggle (User / Dev) */
+        .seg-toggle {
+            display: inline-flex;
+            padding: 3px;
+            background: rgba(255,255,255,0.04);
+            border: 1px solid var(--glass-border);
+            border-radius: 999px;
+            flex-shrink: 0;
+        }
+        .seg-toggle button {
+            border: none; background: transparent;
+            color: rgba(255,255,255,0.55);
+            font: inherit; font-size: 11px; font-weight: 500;
+            letter-spacing: 0.6px; text-transform: uppercase;
+            padding: 6px 14px; border-radius: 999px;
+            cursor: pointer;
+            transition: background 0.25s ease, color 0.25s ease;
+        }
+        .seg-toggle button.active {
+            background: rgba(var(--state-color), 0.22);
+            color: rgba(255,255,255,0.95);
+            box-shadow: 0 0 12px rgba(var(--state-color), 0.25);
+        }
+        .settings-coming-soon {
+            font-size: 11px; color: rgba(255,255,255,0.32);
+            font-style: italic;
+        }
+
+        /* Native <select> dressed up to match the settings sheet aesthetic. */
+        .settings-select {
+            position: relative;
+            display: inline-flex; align-items: center;
+            flex-shrink: 0;
+        }
+        .settings-select select {
+            -webkit-appearance: none; -moz-appearance: none; appearance: none;
+            background: rgba(255,255,255,0.04);
+            border: 1px solid var(--glass-border);
+            border-radius: 8px;
+            color: rgba(255,255,255,0.92);
+            font: inherit; font-size: 12px;
+            padding: 7px 28px 7px 12px;
+            cursor: pointer;
+            max-width: 220px;
+            text-overflow: ellipsis;
+            transition: background 0.2s ease, border-color 0.2s ease;
+        }
+        .settings-select select:hover {
+            background: rgba(255,255,255,0.07);
+            border-color: rgba(255,255,255,0.18);
+        }
+        .settings-select select:focus {
+            outline: none;
+            border-color: rgba(var(--state-color), 0.55);
+            box-shadow: 0 0 0 3px rgba(var(--state-color), 0.18);
+        }
+        .settings-select select option {
+            background: #1a1a24;
+            color: rgba(255,255,255,0.9);
+        }
+        .settings-select-caret {
+            position: absolute; right: 8px; top: 50%;
+            transform: translateY(-50%);
+            width: 12px; height: 12px;
+            pointer-events: none;
+            display: inline-flex;
+        }
+        .settings-select-caret svg {
+            width: 100%; height: 100%; fill: none;
+            stroke: rgba(255,255,255,0.45); stroke-width: 2;
+            stroke-linecap: round; stroke-linejoin: round;
+        }
+
+        /* --- LIVE TOOL CHIPS (during a streaming assistant turn) --- */
+        .live-tools {
+            display: flex; flex-direction: column;
+            align-items: flex-start;
+            gap: 5px;
+            margin: 0 0 6px;
+            padding: 0 2px;
+        }
+        .live-tool-chip {
+            display: inline-flex; align-items: center; gap: 7px;
+            padding: 5px 11px 5px 9px;
+            border-radius: 999px;
+            background: rgba(var(--state-color), 0.10);
+            border: 1px solid rgba(var(--state-color), 0.28);
+            color: rgba(255,255,255,0.85);
+            font-size: 11px;
+            letter-spacing: 0.4px;
+            backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+            animation: chip-slide-in 0.25s ease-out;
+        }
+        @keyframes chip-slide-in {
+            from { opacity: 0; transform: translateY(4px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+        .live-tool-chip .chip-dot {
+            width: 7px; height: 7px; border-radius: 50%;
+            background: rgba(var(--state-color), 1);
+            box-shadow: 0 0 6px rgba(var(--state-color), 0.8);
+            flex-shrink: 0;
+        }
+        .live-tool-chip.running .chip-dot { display: none; }
+        .live-tool-chip.done {
+            background: rgba(255,255,255,0.04);
+            border-color: rgba(255,255,255,0.1);
+            color: rgba(255,255,255,0.55);
+        }
+        .live-tool-chip.done .chip-dot {
+            background: rgba(140, 220, 160, 0.95);
+            box-shadow: 0 0 6px rgba(140, 220, 160, 0.6);
+        }
+        .live-tool-chip.done .chip-spinner { display: none; }
+        /* Claude-style spinner ring — single arc, smooth rotation, no flash. */
+        .chip-spinner {
+            width: 11px; height: 11px;
+            border-radius: 50%;
+            border: 1.5px solid rgba(var(--state-color), 0.22);
+            border-top-color: rgba(var(--state-color), 1);
+            flex-shrink: 0;
+            animation: chip-spin 0.75s linear infinite;
+        }
+        @keyframes chip-spin {
+            to { transform: rotate(360deg); }
+        }
+        @media (prefers-reduced-motion: reduce) {
+            .chip-spinner { animation-duration: 2.4s; }
+        }
+        .live-tool-chip .chip-label {
+            font-weight: 500;
+        }
+        .live-tool-chip .chip-name {
+            color: rgba(255,255,255,0.95);
+            font-weight: 600;
+        }
+
+        /* --- THOUGHTS PANEL (collapsed by default, after turn ends) --- */
+        .thoughts {
+            margin: 0 0 6px;
+            border-radius: 10px;
+            background: rgba(255,255,255,0.02);
+            border: 1px solid rgba(255,255,255,0.06);
+            overflow: hidden;
+            transition: background 0.2s ease, border-color 0.2s ease;
+        }
+        .thoughts:hover {
+            background: rgba(255,255,255,0.035);
+            border-color: rgba(255,255,255,0.1);
+        }
+        .thoughts-header {
+            display: flex; align-items: center; gap: 8px;
+            padding: 7px 11px;
+            cursor: pointer;
+            font-size: 11px;
+            color: rgba(255,255,255,0.55);
+            letter-spacing: 0.3px;
+            user-select: none;
+        }
+        .thoughts-chevron {
+            width: 10px; height: 10px;
+            transition: transform 0.2s ease;
+            flex-shrink: 0;
+        }
+        .thoughts-chevron svg {
+            width: 100%; height: 100%; fill: none;
+            stroke: rgba(255,255,255,0.5); stroke-width: 2;
+            stroke-linecap: round; stroke-linejoin: round;
+        }
+        .thoughts.open .thoughts-chevron { transform: rotate(90deg); }
+        .thoughts-label {
+            flex: 1; min-width: 0;
+        }
+        .thoughts-count {
+            font-size: 10px;
+            color: rgba(255,255,255,0.35);
+            font-variant-numeric: tabular-nums;
+        }
+        .thoughts-detail {
+            display: none;
+            padding: 4px 11px 11px;
+            border-top: 1px solid rgba(255,255,255,0.04);
+        }
+        .thoughts.open .thoughts-detail { display: block; }
+        .thought-trace-placeholder {
+            font-size: 11px;
+            color: rgba(255,255,255,0.3);
+            font-style: italic;
+            padding: 8px 0 10px;
+            line-height: 1.5;
+        }
+        .thought-tools-label {
+            font-size: 9px; font-weight: 600;
+            text-transform: uppercase; letter-spacing: 1.2px;
+            color: rgba(255,255,255,0.35);
+            margin: 4px 0 6px;
+        }
+        .thought-tool {
+            border-radius: 8px;
+            background: rgba(255,255,255,0.025);
+            border: 1px solid rgba(255,255,255,0.05);
+            margin-bottom: 5px;
+            overflow: hidden;
+        }
+        .thought-tool:last-child { margin-bottom: 0; }
+        .thought-tool-header {
+            display: flex; align-items: center; gap: 8px;
+            padding: 6px 10px;
+            font-size: 11px;
+            color: rgba(255,255,255,0.7);
+        }
+        body[data-mode="dev"] .thought-tool-header {
+            cursor: pointer;
+        }
+        .thought-tool-dot {
+            width: 6px; height: 6px; border-radius: 50%;
+            background: rgba(140, 220, 160, 0.95);
+            flex-shrink: 0;
+        }
+        .thought-tool-name {
+            flex: 1; min-width: 0;
+            color: rgba(255,255,255,0.92);
+            font-weight: 500;
+            overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+        }
+        .thought-tool-expand {
+            width: 10px; height: 10px;
+            transition: transform 0.2s ease;
+            flex-shrink: 0;
+            display: none;
+        }
+        body[data-mode="dev"] .thought-tool-expand { display: block; }
+        .thought-tool-expand svg {
+            width: 100%; height: 100%; fill: none;
+            stroke: rgba(255,255,255,0.4); stroke-width: 2;
+            stroke-linecap: round; stroke-linejoin: round;
+        }
+        .thought-tool.open .thought-tool-expand { transform: rotate(90deg); }
+        .thought-tool-result {
+            display: none;
+            padding: 0 10px 10px;
+            margin: 0;
+            font-family: 'SF Mono', Menlo, Monaco, Consolas, monospace;
+            font-size: 10.5px;
+            line-height: 1.5;
+            color: rgba(255,255,255,0.6);
+            white-space: pre-wrap;
+            word-break: break-word;
+            max-height: 220px;
+            overflow-y: auto;
+            border-top: 1px solid rgba(255,255,255,0.04);
+            padding-top: 8px;
+        }
+        body[data-mode="dev"] .thought-tool.open .thought-tool-result {
+            display: block;
+        }
+        .thought-tool-result::-webkit-scrollbar { width: 3px; }
+        .thought-tool-result::-webkit-scrollbar-thumb {
+            background: rgba(255,255,255,0.1); border-radius: 2px;
+        }
+
+        /* User mode: hide the per-tool expand chevron + any open results. */
+        body[data-mode="user"] .thought-tool { cursor: default; }
+        body[data-mode="user"] .thought-tool-result { display: none !important; }
     </style>
 </head>
 
 <body>
+    <!-- Cyberpunk / Jarvis-style ambient backdrop. Layers are pointer-
+         events:none, sit behind the dashboard, and pick up --state-color so
+         the whole environment reacts to the orb. The star field is the
+         hero: gentle radial drift at idle, hyperspace warp during
+         PROCESSING, easing back when SPEAKING. -->
+    <div class="cyber-bg" aria-hidden="true">
+        <div class="cyber-grid cyber-grid-bottom"></div>
+        <div class="cyber-grid cyber-grid-top"></div>
+    </div>
+
+    <!-- Brand wordmark. Replace the <span> with an <img src="..." class="brand-logo">
+         once the EDGE AI logo file is dropped under sample_media/ui/. -->
+    <div class="brand-wordmark" aria-label="Edge AI">
+        <!-- <img src="/sample_media/ui/edge-ai-logo.svg" class="brand-logo" alt="Edge AI"> -->
+        <span class="brand-text">
+            <span class="brand-text-edge">EDGE</span>
+            <span class="brand-text-ai">AI</span>
+        </span>
+    </div>
+
     <!-- Film grain -->
     <div class="grain">
         <svg><filter id="grain-filter"><feTurbulence type="fractalNoise" baseFrequency="0.65" numOctaves="3" stitchTiles="stitch"/></filter><rect width="100%" height="100%" filter="url(#grain-filter)"/></svg>
@@ -859,29 +2348,51 @@
             <button class="panel-collapse" id="nav-collapse" title="Collapse navigation">
                 <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
             </button>
-            <!-- Map -->
-            <div class="nav-map-container">
-                <div id="nav-map"></div>
-            </div>
 
-            <div class="nav-header">
-                <div class="nav-header-label">Navigation</div>
-                <div class="nav-route-summary" id="nav-route-summary">
-                    <span class="nav-duration" id="nav-duration">--</span>
-                    <span class="nav-distance" id="nav-distance"></span>
+            <!-- Map fills the panel -->
+            <div id="nav-map"></div>
+
+            <!-- Top overlay: maneuver banner -->
+            <div class="nav-maneuver" id="nav-maneuver">
+                <div class="nav-maneuver-glyph" id="nav-maneuver-glyph"></div>
+                <div class="nav-maneuver-text">
+                    <div class="nav-maneuver-distance" id="nav-maneuver-distance">--</div>
+                    <div class="nav-maneuver-instruction" id="nav-maneuver-instruction"></div>
                 </div>
-                <div class="nav-destination" id="nav-destination"></div>
             </div>
 
-            <!-- Current instruction -->
-            <div class="nav-current" id="nav-current">
-                <div class="nav-current-label">Next</div>
-                <div class="nav-current-instruction" id="nav-current-instruction"></div>
-                <div class="nav-current-detail" id="nav-current-detail"></div>
+            <!-- Bottom overlay: ETA strip + collapsible steps sheet -->
+            <div class="nav-bottom" id="nav-bottom">
+                <div class="nav-next-stop" id="nav-next-stop">
+                    <span class="nav-next-stop-dot"></span>
+                    <span class="nav-next-stop-label" id="nav-next-stop-label">Next stop</span>
+                    <span class="nav-next-stop-address" id="nav-next-stop-address"></span>
+                </div>
+                <div class="nav-eta" id="nav-eta">
+                    <div class="nav-eta-stat">
+                        <div class="nav-eta-value" id="nav-eta-arrival">--</div>
+                        <div class="nav-eta-label">Arrival</div>
+                    </div>
+                    <div class="nav-eta-stat">
+                        <div class="nav-eta-value" id="nav-eta-remaining">--</div>
+                        <div class="nav-eta-label">Remaining</div>
+                    </div>
+                    <div class="nav-eta-stat">
+                        <div class="nav-eta-value" id="nav-eta-distance">--</div>
+                        <div class="nav-eta-label">Distance</div>
+                    </div>
+                    <button class="nav-steps-toggle" id="nav-steps-toggle" title="View all steps">
+                        <svg viewBox="0 0 24 24"><polyline points="18 15 12 9 6 15"/></svg>
+                    </button>
+                </div>
+                <div class="nav-steps-sheet" id="nav-steps-sheet">
+                    <div class="nav-steps-sheet-header">
+                        <span>All steps</span>
+                        <span id="nav-destination-summary"></span>
+                    </div>
+                    <div class="nav-steps" id="nav-steps"></div>
+                </div>
             </div>
-
-            <!-- Step list -->
-            <div class="nav-steps" id="nav-steps"></div>
         </div>
 
         <!-- CENTER: Voice Assistant -->
@@ -895,7 +2406,7 @@
                 </div>
 
                 <div class="heading-area">
-                    <h1>Edge AI</h1>
+                    <h1>I'm Hannah</h1>
                     <h2>How can I help?</h2>
                 </div>
 
@@ -927,9 +2438,21 @@
                 </div>
             </div>
             <div class="music-header">
-                <div class="music-header-label">Now Playing</div>
+                <div class="music-header-label" id="music-header-label">Now Playing</div>
                 <div class="music-track" id="music-track"></div>
                 <div class="music-artist" id="music-artist"></div>
+            </div>
+            <div class="music-controls">
+                <button class="music-ctl" id="music-prev" title="Previous">
+                    <svg viewBox="0 0 24 24"><polygon points="19 20 9 12 19 4 19 20"/><line x1="5" y1="5" x2="5" y2="19"/></svg>
+                </button>
+                <button class="music-ctl music-ctl-primary" id="music-play-pause" title="Play/Pause">
+                    <svg id="music-icon-play" viewBox="0 0 24 24"><polygon points="6 4 20 12 6 20 6 4"/></svg>
+                    <svg id="music-icon-pause" viewBox="0 0 24 24" style="display:none"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
+                </button>
+                <button class="music-ctl" id="music-next" title="Next">
+                    <svg viewBox="0 0 24 24"><polygon points="5 4 15 12 5 20 5 4"/><line x1="19" y1="5" x2="19" y2="19"/></svg>
+                </button>
             </div>
         </div>
     </div>
@@ -937,32 +2460,35 @@
     <!-- Bottom bar -->
     <div class="controls-bar">
         <div class="vehicle-chips">
-            <div class="vehicle-chip" id="chip-temp">
+            <div class="vehicle-chip" id="chip-temp" tabindex="0" role="button" aria-label="Cabin temperature">
                 <svg viewBox="0 0 24 24"><path d="M14 14.76V3.5a2.5 2.5 0 0 0-5 0v11.26a4.5 4.5 0 1 0 5 0z"/></svg>
-                <span class="chip-value" id="chip-temp-value">72</span>&deg;F
+                <span class="chip-value" id="chip-temp-value">--</span><span id="chip-temp-unit">&deg;F</span>
             </div>
-            <div class="vehicle-chip" id="chip-location">
+            <div class="vehicle-chip" id="chip-location" tabindex="0" role="button" aria-label="Current location">
                 <svg viewBox="0 0 24 24"><circle cx="12" cy="10" r="3"/><path d="M12 2a8 8 0 0 0-8 8c0 5.4 7 11.5 7.3 11.8a1 1 0 0 0 1.4 0C13 21.5 20 15.4 20 10a8 8 0 0 0-8-8z"/></svg>
-                <span class="chip-value" id="chip-location-value">San Francisco, CA</span>
-            </div>
-            <div class="voice-selector" id="voice-selector" style="display:none">
-                <svg viewBox="0 0 24 24"><path d="M12 1a4 4 0 0 0-4 4v6a4 4 0 0 0 8 0V5a4 4 0 0 0-4-4z"/><path d="M19 10v1a7 7 0 0 1-14 0v-1"/></svg>
-                <select id="voice-select"></select>
+                <span class="chip-value" id="chip-location-value">Locating…</span>
             </div>
         </div>
 
-        <button id="btn-talk" onmousedown="triggerListen()">
-            <svg viewBox="0 0 24 24"><path d="M12 1a4 4 0 0 0-4 4v6a4 4 0 0 0 8 0V5a4 4 0 0 0-4-4z"/><path d="M19 10v1a7 7 0 0 1-14 0v-1"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
-            <span id="btn-talk-label">Push to Talk</span>
-        </button>
-        <button id="btn-stop" onmousedown="triggerStop()" title="Stop">
-            <svg viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2" ry="2"></rect></svg>
-        </button>
-        <button id="btn-clear" onmousedown="triggerClear()" title="Clear conversation">
-            <svg viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
-        </button>
+        <div class="control-cluster">
+            <div class="chat-input" id="chat-input">
+                <svg class="chat-input-icon" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                <textarea id="chat-input-box" rows="1" placeholder="Type a message…"></textarea>
+            </div>
+            <button id="btn-talk" type="button">
+                <svg viewBox="0 0 24 24"><path d="M12 1a4 4 0 0 0-4 4v6a4 4 0 0 0 8 0V5a4 4 0 0 0-4-4z"/><path d="M19 10v1a7 7 0 0 1-14 0v-1"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+                <span id="btn-talk-label">Push to Talk</span>
+            </button>
+            <button id="btn-clear" type="button" title="Clear conversation">
+                <svg viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
+            </button>
+        </div>
 
         <div class="right-chips">
+            <div class="vehicle-chip empty" id="chip-music" tabindex="0" role="button" aria-label="Music" aria-pressed="false">
+                <svg viewBox="0 0 24 24"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+                <span class="chip-value" id="chip-music-value"></span>
+            </div>
             <div class="climate-widget" id="climate-widget">
                 <div class="climate-mode-icon auto" id="climate-mode-icon">
                     <svg id="climate-icon-auto" viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-9-9"/><polyline points="21 3 21 9 15 9"/></svg>
@@ -974,12 +2500,153 @@
                     <span></span><span></span><span></span><span></span><span></span>
                 </div>
             </div>
+            <button id="btn-settings" type="button" title="Settings">
+                <svg viewBox="0 0 24 24">
+                    <circle cx="12" cy="12" r="3"/>
+                    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+                </svg>
+                <span class="mode-pip" aria-hidden="true"></span>
+            </button>
             <div class="clock-area" id="clock"></div>
+        </div>
+
+        <div class="chip-popover" id="weather-popover" aria-live="polite" aria-hidden="true">
+            <span class="chip-popover-label">Weather</span>
+            <span class="chip-popover-value" id="weather-popover-value">--&deg;F</span>
+        </div>
+    </div>
+
+    <!-- Settings overlay + panel (slides up above the controls bar) -->
+    <div class="settings-overlay" id="settings-overlay" aria-hidden="true"></div>
+    <div class="settings-panel" id="settings-panel" role="dialog" aria-label="Settings" aria-hidden="true">
+        <div class="settings-panel-header">
+            <div class="settings-panel-title">Settings</div>
+            <button class="settings-panel-close" id="settings-close" title="Close settings" aria-label="Close settings">
+                <svg viewBox="0 0 24 24"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg>
+            </button>
+        </div>
+
+        <div class="settings-section">
+            <div class="settings-section-label">Display</div>
+            <div class="settings-row">
+                <div class="settings-row-text">
+                    <div class="settings-row-title">Mode</div>
+                    <div class="settings-row-hint" id="mode-hint">Compact view. Tools are listed by name.</div>
+                </div>
+                <div class="seg-toggle" role="tablist" aria-label="Display mode">
+                    <button type="button" data-mode="user" role="tab">User</button>
+                    <button type="button" data-mode="dev" role="tab">Dev</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="settings-section" id="settings-voice-section">
+            <div class="settings-section-label">Voice</div>
+            <div class="settings-row">
+                <div class="settings-row-text">
+                    <div class="settings-row-title">TTS voice</div>
+                    <div class="settings-row-hint" id="voice-hint">Loading voices…</div>
+                </div>
+                <div class="settings-select" id="voice-select-wrap">
+                    <select id="voice-select" aria-label="TTS voice" disabled></select>
+                    <span class="settings-select-caret" aria-hidden="true">
+                        <svg viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <div class="settings-section">
+            <div class="settings-section-label">LLM &amp; Agent</div>
+            <div class="settings-coming-soon">More options coming soon — model, agent profile.</div>
         </div>
     </div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
+    function readViewportHeight() {
+        const heights = [];
+        if (window.visualViewport && window.visualViewport.height) heights.push(window.visualViewport.height);
+        if (window.innerHeight) heights.push(window.innerHeight);
+        if (document.documentElement.clientHeight) heights.push(document.documentElement.clientHeight);
+        const height = heights.length ? Math.min(...heights) : 0;
+        return Math.max(1, Math.round(height || window.innerHeight || 0));
+    }
+
+    function clampNumber(value, min, max) {
+        return Math.min(max, Math.max(min, value));
+    }
+
+    function getViewportChromeGuards() {
+        const isCoarsePointer = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
+        const isStandalone = window.navigator.standalone === true ||
+            (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches);
+        const viewport = window.visualViewport;
+        if (!isCoarsePointer || isStandalone || !viewport) {
+            return { top: 0, bottom: 0 };
+        }
+
+        const layoutHeight = window.innerHeight || document.documentElement.clientHeight || viewport.height;
+        const viewportTop = Math.max(0, viewport.offsetTop || 0);
+        const viewportBottom = Math.max(0, layoutHeight - viewport.height - viewportTop);
+
+        return {
+            top: clampNumber(Math.round(viewportTop), 0, 44),
+            bottom: clampNumber(Math.round(viewportBottom), 0, 72),
+        };
+    }
+
+    function getMobileDockBottomGuard(bottomGuard) {
+        const isStandalone = window.navigator.standalone === true ||
+            (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches);
+        const isPhonePortrait = window.matchMedia &&
+            window.matchMedia('(max-width: 640px) and (orientation: portrait)').matches;
+        const isIOS = /iP(ad|hone|od)/.test(navigator.userAgent) ||
+            (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+        const safariToolbarFloor = (isIOS && isPhonePortrait && !isStandalone) ? 56 : 0;
+        return clampNumber(Math.max(Math.round(bottomGuard * 0.85), safariToolbarFloor), 0, 64);
+    }
+
+    function syncViewportHeight() {
+        const root = document.documentElement;
+        const guards = getViewportChromeGuards();
+        const dockBottomGuard = getMobileDockBottomGuard(guards.bottom);
+        root.style.setProperty('--app-height', `${readViewportHeight()}px`);
+        root.style.setProperty('--mobile-browser-top-guard', `${guards.top}px`);
+        root.style.setProperty('--mobile-browser-bottom-guard', `${guards.bottom}px`);
+        root.style.setProperty('--mobile-dock-bottom-guard', `${dockBottomGuard}px`);
+    }
+
+    function scheduleViewportSync() {
+        syncViewportHeight();
+        requestAnimationFrame(syncViewportHeight);
+        [80, 180, 360, 720, 1200].forEach(delay => {
+            setTimeout(syncViewportHeight, delay);
+        });
+    }
+
+    scheduleViewportSync();
+    window.addEventListener('resize', scheduleViewportSync);
+    window.addEventListener('orientationchange', scheduleViewportSync);
+    window.addEventListener('pageshow', scheduleViewportSync);
+    document.addEventListener('visibilitychange', scheduleViewportSync);
+    if (window.visualViewport) {
+        window.visualViewport.addEventListener('resize', scheduleViewportSync);
+        window.visualViewport.addEventListener('scroll', scheduleViewportSync);
+    }
+
+    // --- LOCATION FORMATTING ---
+    // City only (first comma-segment of the geocoded address), or
+    // "lat, lon" if we have no address yet.
+    function formatLocationChip(loc) {
+        if (!loc) return '';
+        if (loc.address) {
+            const city = loc.address.split(',')[0].trim();
+            if (city) return city;
+        }
+        return `${loc.latitude.toFixed(3)}, ${loc.longitude.toFixed(3)}`;
+    }
+
     // --- API ---
     function triggerListen() { fetch('/api/trigger', { method: 'POST' }).catch(console.error); }
     function triggerStop() { fetch('/api/stop', { method: 'POST' }).catch(console.error); }
@@ -992,6 +2659,18 @@
         if (empty) empty.style.display = 'flex';
         renderedCount = 0;
         lastRawTranscript = '';
+        lastTurnSignatures = [];
+    }
+
+    let textInFlight = false;
+    function sendText(text) {
+        if (textInFlight) return;
+        const trimmed = text.trim();
+        if (!trimmed) return;
+        textInFlight = true;
+        fetch('/api/sendText', { method: 'POST', body: trimmed })
+            .catch(console.error)
+            .finally(() => { textInFlight = false; });
     }
 
     // --- STATE ---
@@ -1026,7 +2705,92 @@
     const emptyState = document.getElementById('empty-state');
     const btnTalk = document.getElementById('btn-talk');
     const btnTalkLabel = document.getElementById('btn-talk-label');
-    const btnStop = document.getElementById('btn-stop');
+    const btnClear = document.getElementById('btn-clear');
+    let interruptListenToken = 0;
+
+    function cancelPendingInterruptListen() {
+        interruptListenToken++;
+    }
+
+    function triggerInterruptListen() {
+        const token = ++interruptListenToken;
+        applyState(STATE.LISTENING);
+        fetch('/api/stop', { method: 'POST' })
+            .catch(console.error)
+            .finally(() => {
+                if (token !== interruptListenToken) return;
+                triggerListen();
+            });
+    }
+
+    function handleTalkClick() {
+        if (currentState === STATE.IDLE) triggerListen();
+        else if (currentState === STATE.LISTENING) {
+            cancelPendingInterruptListen();
+            triggerStop();
+        } else {
+            triggerInterruptListen();
+        }
+    }
+
+    btnTalk.addEventListener('click', handleTalkClick);
+    btnClear.addEventListener('click', triggerClear);
+
+    // --- SETTINGS PANEL + DISPLAY MODE ---
+    const MODE_KEY = 'incar-display-mode';
+    const btnSettings = document.getElementById('btn-settings');
+    const settingsPanel = document.getElementById('settings-panel');
+    const settingsOverlay = document.getElementById('settings-overlay');
+    const settingsClose = document.getElementById('settings-close');
+    const modeHint = document.getElementById('mode-hint');
+    const modeButtons = settingsPanel.querySelectorAll('.seg-toggle button[data-mode]');
+
+    const MODE_HINTS = {
+        user: 'Compact view. Tools are listed by name.',
+        dev: 'Expanded view. Tool results are inspectable.',
+    };
+
+    function applyMode(mode) {
+        const m = mode === 'dev' ? 'dev' : 'user';
+        document.body.setAttribute('data-mode', m);
+        modeButtons.forEach(b => {
+            b.classList.toggle('active', b.dataset.mode === m);
+            b.setAttribute('aria-selected', b.dataset.mode === m ? 'true' : 'false');
+        });
+        if (modeHint) modeHint.textContent = MODE_HINTS[m];
+        try { localStorage.setItem(MODE_KEY, m); } catch (e) {}
+    }
+
+    function openSettings() {
+        settingsPanel.classList.add('open');
+        settingsOverlay.classList.add('open');
+        btnSettings.classList.add('active');
+        settingsPanel.setAttribute('aria-hidden', 'false');
+    }
+    function closeSettings() {
+        settingsPanel.classList.remove('open');
+        settingsOverlay.classList.remove('open');
+        btnSettings.classList.remove('active');
+        settingsPanel.setAttribute('aria-hidden', 'true');
+    }
+
+    btnSettings.addEventListener('click', () => {
+        if (settingsPanel.classList.contains('open')) closeSettings();
+        else openSettings();
+    });
+    settingsClose.addEventListener('click', closeSettings);
+    settingsOverlay.addEventListener('click', closeSettings);
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && settingsPanel.classList.contains('open')) closeSettings();
+    });
+    modeButtons.forEach(b => {
+        b.addEventListener('click', () => applyMode(b.dataset.mode));
+    });
+
+    // Initialize mode from localStorage (default: user).
+    let savedMode = 'user';
+    try { savedMode = localStorage.getItem(MODE_KEY) || 'user'; } catch (e) {}
+    applyMode(savedMode);
 
     const musicPanel = document.getElementById('music-panel');
     const musicTrack = document.getElementById('music-track');
@@ -1042,26 +2806,224 @@
     // Panel collapse state (prevents polling from reopening manually collapsed panels)
     let navCollapsed = false;
     let musicCollapsed = false;
+    const phoneLayoutQuery = window.matchMedia('(max-width: 640px), (max-height: 480px)');
+    const isPhoneLayout = () => phoneLayoutQuery.matches;
+
+    // Centralised panel toggles so the corresponding bottom-bar chip stays in
+    // sync with the panel itself. Use these — don't touch panel.classList
+    // directly — so chip highlights never desync from the slide-out state.
+    function setNavOpen(open) {
+        const panel = document.getElementById('nav-panel');
+        const chip  = document.getElementById('chip-location');
+        if (!panel) return;
+        panel.classList.toggle('active', !!open);
+        if (open) {
+            showDefaultMapView();
+        }
+        if (chip) {
+            chip.classList.toggle('toggle-active', !!open);
+            chip.setAttribute('aria-pressed', open ? 'true' : 'false');
+        }
+    }
+    function setMusicOpen(open) {
+        const panel = document.getElementById('music-panel');
+        const chip  = document.getElementById('chip-music');
+        if (!panel) return;
+        if (open && isPhoneLayout()) open = false;
+        panel.classList.toggle('active', !!open);
+        if (chip) {
+            chip.classList.toggle('toggle-active', !!open);
+            chip.setAttribute('aria-pressed', open ? 'true' : 'false');
+        }
+    }
+
+    const handlePhoneLayoutChange = () => {
+        if (isPhoneLayout()) setMusicOpen(false);
+    };
+    if (phoneLayoutQuery.addEventListener) {
+        phoneLayoutQuery.addEventListener('change', handlePhoneLayoutChange);
+    } else {
+        phoneLayoutQuery.addListener(handlePhoneLayoutChange);
+    }
 
     document.getElementById('nav-collapse').addEventListener('click', () => {
         navCollapsed = true;
-        navPanel.classList.remove('active');
+        setNavOpen(false);
     });
 
     document.getElementById('music-collapse').addEventListener('click', () => {
         musicCollapsed = true;
-        musicPanel.classList.remove('active');
+        setMusicOpen(false);
+    });
+
+    // Location chip → toggle the nav panel. Clears the "collapsed" latch when
+    // opening so subsequent route updates don't fight the user.
+    const chipLocation = document.getElementById('chip-location');
+    function toggleNav() {
+        const panel = document.getElementById('nav-panel');
+        const willOpen = !panel.classList.contains('active');
+        if (willOpen) navCollapsed = false;
+        else navCollapsed = true;
+        setNavOpen(willOpen);
+    }
+    chipLocation.addEventListener('click', toggleNav);
+    chipLocation.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleNav(); }
+    });
+    chipLocation.setAttribute('aria-pressed', 'false');
+
+    // Music chip → toggle the music panel. Same latch behavior as nav.
+    const chipMusic = document.getElementById('chip-music');
+    function toggleMusic() {
+        if (isPhoneLayout()) return;
+        const panel = document.getElementById('music-panel');
+        const willOpen = !panel.classList.contains('active');
+        if (willOpen) musicCollapsed = false;
+        else musicCollapsed = true;
+        setMusicOpen(willOpen);
+    }
+    chipMusic.addEventListener('click', toggleMusic);
+    chipMusic.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleMusic(); }
+    });
+
+    const chipTemp = document.getElementById('chip-temp');
+    const weatherPopover = document.getElementById('weather-popover');
+    const weatherPopoverValue = document.getElementById('weather-popover-value');
+    let weatherPopoverTimer = null;
+    let currentWeatherTempText = '--&deg;F';
+
+    function positionWeatherPopover() {
+        const bar = document.querySelector('.controls-bar');
+        if (!bar || !chipTemp) return;
+        const chipRect = chipTemp.getBoundingClientRect();
+        const barRect = bar.getBoundingClientRect();
+        const popoverHalfWidth = 38;
+        const center = chipRect.left + chipRect.width / 2 - barRect.left;
+        const left = Math.min(Math.max(center, popoverHalfWidth), barRect.width - popoverHalfWidth);
+        bar.style.setProperty('--popover-left', `${left}px`);
+    }
+
+    function showWeatherPopover() {
+        if (!weatherPopover || !weatherPopoverValue) return;
+        weatherPopoverValue.innerHTML = currentWeatherTempText;
+        positionWeatherPopover();
+        weatherPopover.classList.add('open');
+        weatherPopover.setAttribute('aria-hidden', 'false');
+        clearTimeout(weatherPopoverTimer);
+        weatherPopoverTimer = setTimeout(() => {
+            weatherPopover.classList.remove('open');
+            weatherPopover.setAttribute('aria-hidden', 'true');
+        }, 1800);
+    }
+
+    function setWeatherTempDisplay(temperature, units) {
+        const unitText = '&deg;' + (units || 'F');
+        currentWeatherTempText = `${temperature}${unitText}`;
+        document.getElementById('chip-temp-value').textContent = temperature;
+        document.getElementById('chip-temp-unit').innerHTML = unitText;
+        if (weatherPopoverValue) weatherPopoverValue.innerHTML = currentWeatherTempText;
+    }
+
+    chipTemp.addEventListener('click', showWeatherPopover);
+    chipTemp.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            showWeatherPopover();
+        }
+    });
+    window.addEventListener('resize', () => {
+        if (weatherPopover && weatherPopover.classList.contains('open')) positionWeatherPopover();
     });
 
     const navPanel = document.getElementById('nav-panel');
-    const navRouteSummary = document.getElementById('nav-route-summary');
-    const navDuration = document.getElementById('nav-duration');
-    const navDistance = document.getElementById('nav-distance');
-    const navDestination = document.getElementById('nav-destination');
-    const navCurrent = document.getElementById('nav-current');
-    const navCurrentInstruction = document.getElementById('nav-current-instruction');
-    const navCurrentDetail = document.getElementById('nav-current-detail');
+    const navManeuver = document.getElementById('nav-maneuver');
+    const navManeuverGlyph = document.getElementById('nav-maneuver-glyph');
+    const navManeuverDistance = document.getElementById('nav-maneuver-distance');
+    const navManeuverInstruction = document.getElementById('nav-maneuver-instruction');
+    const navBottom = document.getElementById('nav-bottom');
+    const navEtaArrival = document.getElementById('nav-eta-arrival');
+    const navEtaRemaining = document.getElementById('nav-eta-remaining');
+    const navEtaDistance = document.getElementById('nav-eta-distance');
+    const navStepsSheet = document.getElementById('nav-steps-sheet');
+    const navStepsToggle = document.getElementById('nav-steps-toggle');
+    const navDestinationSummary = document.getElementById('nav-destination-summary');
+    const navNextStop = document.getElementById('nav-next-stop');
+    const navNextStopLabel = document.getElementById('nav-next-stop-label');
+    const navNextStopAddress = document.getElementById('nav-next-stop-address');
     const navSteps = document.getElementById('nav-steps');
+
+    navStepsToggle.addEventListener('click', () => {
+        navBottom.classList.toggle('expanded');
+    });
+
+    // --- MANEUVER GLYPHS ---
+    // Compact set of stroke-based icons; remap many enum values onto them.
+    const MANEUVER_GLYPHS = {
+        'straight':       '<svg viewBox="0 0 24 24"><line x1="12" y1="20" x2="12" y2="6"/><polyline points="6 12 12 6 18 12"/></svg>',
+        'turn-left':      '<svg viewBox="0 0 24 24"><path d="M18 19V12a4 4 0 0 0-4-4H7"/><polyline points="11 4 7 8 11 12"/></svg>',
+        'turn-right':     '<svg viewBox="0 0 24 24"><path d="M6 19V12a4 4 0 0 1 4-4h7"/><polyline points="13 4 17 8 13 12"/></svg>',
+        'slight-left':    '<svg viewBox="0 0 24 24"><line x1="14" y1="20" x2="9" y2="6"/><polyline points="6 11 9 6 14 8"/></svg>',
+        'slight-right':   '<svg viewBox="0 0 24 24"><line x1="10" y1="20" x2="15" y2="6"/><polyline points="10 8 15 6 18 11"/></svg>',
+        'sharp-left':     '<svg viewBox="0 0 24 24"><path d="M19 19c-7 0-11-3-11-9"/><polyline points="12 4 8 10 14 11"/></svg>',
+        'sharp-right':    '<svg viewBox="0 0 24 24"><path d="M5 19c7 0 11-3 11-9"/><polyline points="12 4 16 10 10 11"/></svg>',
+        'uturn-left':     '<svg viewBox="0 0 24 24"><path d="M16 21V11a5 5 0 0 0-10 0v3"/><polyline points="2 12 6 16 10 12"/></svg>',
+        'uturn-right':    '<svg viewBox="0 0 24 24"><path d="M8 21V11a5 5 0 0 1 10 0v3"/><polyline points="22 12 18 16 14 12"/></svg>',
+        'merge':          '<svg viewBox="0 0 24 24"><path d="M12 21V12c0-3 3-5 6-5"/><path d="M12 12c0-3-3-5-6-5"/><polyline points="14 5 18 7 16 11"/></svg>',
+        'fork-left':      '<svg viewBox="0 0 24 24"><path d="M12 21v-7c0-3-3-5-6-5"/><path d="M12 14c0-3 3-5 6-5"/><polyline points="4 11 6 9 4 7"/></svg>',
+        'fork-right':     '<svg viewBox="0 0 24 24"><path d="M12 21v-7c0-3 3-5 6-5"/><path d="M12 14c0-3-3-5-6-5"/><polyline points="20 11 18 9 20 7"/></svg>',
+        'keep-left':      '<svg viewBox="0 0 24 24"><line x1="13" y1="20" x2="9" y2="6"/><polyline points="6 11 9 6 13 9"/></svg>',
+        'keep-right':     '<svg viewBox="0 0 24 24"><line x1="11" y1="20" x2="15" y2="6"/><polyline points="11 9 15 6 18 11"/></svg>',
+        'roundabout':     '<svg viewBox="0 0 24 24"><circle cx="12" cy="13" r="5"/><line x1="12" y1="22" x2="12" y2="18"/></svg>',
+        'ramp-left':      '<svg viewBox="0 0 24 24"><path d="M16 21V12c0-3-3-6-6-6"/><polyline points="6 9 10 6 13 10"/></svg>',
+        'ramp-right':     '<svg viewBox="0 0 24 24"><path d="M8 21V12c0-3 3-6 6-6"/><polyline points="11 10 14 6 18 9"/></svg>',
+        'depart':         '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/></svg>',
+        'arrive':         '<svg viewBox="0 0 24 24"><path d="M20 10c0 6-8 12-8 12S4 16 4 10a8 8 0 1 1 16 0z"/><circle cx="12" cy="10" r="3"/></svg>',
+    };
+
+    // Map Google v2 maneuver enum and v1 strings onto our compact glyph set.
+    function maneuverKeyFor(maneuver, instruction) {
+        const m = (maneuver || '').toLowerCase().replace(/_/g, '-');
+        if (m && MANEUVER_GLYPHS[m]) return m;
+        // Common v2 enum aliases
+        const alias = {
+            'turn-slight-left':  'slight-left',
+            'turn-slight-right': 'slight-right',
+            'turn-sharp-left':   'sharp-left',
+            'turn-sharp-right':  'sharp-right',
+            'roundabout-left':   'roundabout',
+            'roundabout-right':  'roundabout',
+            'on-ramp-left':      'ramp-left',
+            'on-ramp-right':     'ramp-right',
+            'off-ramp-left':     'ramp-left',
+            'off-ramp-right':    'ramp-right',
+            'name-change':       'straight',
+        };
+        if (alias[m]) return alias[m];
+        // Heuristic fallback from instruction text.
+        const t = (instruction || '').toLowerCase();
+        if (/u-?turn/.test(t)) return /right/.test(t) ? 'uturn-right' : 'uturn-left';
+        if (/sharp.*left/.test(t))  return 'sharp-left';
+        if (/sharp.*right/.test(t)) return 'sharp-right';
+        if (/slight.*left/.test(t))  return 'slight-left';
+        if (/slight.*right/.test(t)) return 'slight-right';
+        if (/turn\s+left/.test(t))  return 'turn-left';
+        if (/turn\s+right/.test(t)) return 'turn-right';
+        if (/keep\s+left|stay\s+left/.test(t))  return 'keep-left';
+        if (/keep\s+right|stay\s+right/.test(t)) return 'keep-right';
+        if (/merge/.test(t)) return 'merge';
+        if (/fork.*left/.test(t)) return 'fork-left';
+        if (/fork.*right/.test(t)) return 'fork-right';
+        if (/roundabout|rotary/.test(t)) return 'roundabout';
+        if (/ramp/.test(t)) return /right/.test(t) ? 'ramp-right' : 'ramp-left';
+        if (/arrive|destination/.test(t)) return 'arrive';
+        if (/depart|head|start/.test(t)) return 'depart';
+        return 'straight';
+    }
+
+    function maneuverGlyph(maneuver, instruction) {
+        return MANEUVER_GLYPHS[maneuverKeyFor(maneuver, instruction)] || MANEUVER_GLYPHS['straight'];
+    }
 
     // --- CLOCK ---
     function updateClock() {
@@ -1078,15 +3040,42 @@
     let map = null;
     let routeLayer = null;
     let markersLayer = null;
+    // Last known device/vehicle location, populated by /api/location.
+    // Used as the map's initial center; null until first poll succeeds.
+    let currentLocation = null;
+    // Marker for "you are here" — recreated whenever location updates.
+    let locationMarker = null;
+
+    // Reasonable fallback if /api/location hasn't replied by the time the
+    // user triggers their first navigation (rare; ipapi.co is fast).
+    const FALLBACK_CENTER = [39.5, -98.35];  // geographic center of contiguous US
+
+    function showDefaultMapView() {
+        initMap();
+        if (!map) return;
+        if (!currentLocation) {
+            pollLocation();
+        }
+        if (currentLocation && !lastNavJson) {
+            map.setView([currentLocation.latitude, currentLocation.longitude], 12);
+            drawLocationMarker();
+        }
+        requestAnimationFrame(() => map.invalidateSize(false));
+        setTimeout(() => map.invalidateSize(false), 550);
+    }
 
     function initMap() {
         if (map) return;
+        const center = currentLocation
+            ? [currentLocation.latitude, currentLocation.longitude]
+            : FALLBACK_CENTER;
+        const zoom = currentLocation ? 12 : 4;
         map = L.map('nav-map', {
             zoomControl: true,
             attributionControl: false,
             dragging: true,
             scrollWheelZoom: true,
-        }).setView([37.7749, -122.4194], 12);
+        }).setView(center, zoom);
 
         L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
             maxZoom: 19,
@@ -1095,6 +3084,27 @@
 
         routeLayer = L.layerGroup().addTo(map);
         markersLayer = L.layerGroup().addTo(map);
+
+        // Drop the "you are here" marker if we already have a location.
+        if (currentLocation) drawLocationMarker();
+    }
+
+    function drawLocationMarker() {
+        if (!map || !currentLocation) return;
+        if (locationMarker) {
+            map.removeLayer(locationMarker);
+            locationMarker = null;
+        }
+        locationMarker = L.circleMarker(
+            [currentLocation.latitude, currentLocation.longitude],
+            {
+                radius: 6,
+                color: 'rgba(130, 100, 255, 0.9)',
+                fillColor: 'rgba(130, 100, 255, 0.6)',
+                fillOpacity: 0.8,
+                weight: 2,
+            }
+        ).addTo(map);
     }
 
     // Decode Google encoded polyline
@@ -1131,10 +3141,13 @@
         const route = data.routes[0];
         if (!route) return;
 
-        // Draw polyline from overview_polyline
+        // Draw polyline from overview_polyline. Also stash the decoded coords
+        // so we can compute fit-bounds from them when the server doesn't
+        // provide a `route.bounds` (Routes API v2 → v1 conversion drops it).
+        let polylineCoords = null;
         if (route.overview_polyline && route.overview_polyline.points) {
-            const coords = decodePolyline(route.overview_polyline.points);
-            L.polyline(coords, {
+            polylineCoords = decodePolyline(route.overview_polyline.points);
+            L.polyline(polylineCoords, {
                 color: 'rgb(100, 220, 160)',
                 weight: 4,
                 opacity: 0.85,
@@ -1142,35 +3155,59 @@
             }).addTo(routeLayer);
         }
 
-        // Start and end markers
-        const leg = route.legs && route.legs[0];
-        if (leg) {
-            if (leg.start_location) {
-                L.circleMarker([leg.start_location.lat, leg.start_location.lng], {
+        // Start (first leg origin) and end (last leg destination) markers,
+        // plus orange intermediate markers for each waypoint between legs.
+        const legs = (route.legs && route.legs.length) ? route.legs : [];
+        if (legs.length > 0) {
+            const first = legs[0];
+            const last = legs[legs.length - 1];
+            if (first.start_location) {
+                L.circleMarker([first.start_location.lat, first.start_location.lng], {
                     radius: 7, color: '#fff', fillColor: 'rgb(100, 220, 160)',
                     fillOpacity: 1, weight: 2,
                 }).addTo(markersLayer);
             }
-            if (leg.end_location) {
-                L.circleMarker([leg.end_location.lat, leg.end_location.lng], {
+            for (let i = 0; i < legs.length - 1; i++) {
+                const wp = legs[i].end_location;
+                if (!wp) continue;
+                L.circleMarker([wp.lat, wp.lng], {
+                    radius: 5, color: '#fff', fillColor: 'rgb(255, 200, 100)',
+                    fillOpacity: 1, weight: 1.5,
+                }).addTo(markersLayer);
+            }
+            if (last.end_location) {
+                L.circleMarker([last.end_location.lat, last.end_location.lng], {
                     radius: 7, color: '#fff', fillColor: '#ff6666',
                     fillOpacity: 1, weight: 2,
                 }).addTo(markersLayer);
             }
         }
 
-        // Fit bounds
+        // Fit bounds. Prefer server-provided bounds; otherwise derive from
+        // decoded polyline coordinates so multi-leg / cross-state routes
+        // always reframe correctly (Routes API v2 conversion omits bounds).
         if (route.bounds) {
             const sw = route.bounds.southwest;
             const ne = route.bounds.northeast;
             map.fitBounds([[sw.lat, sw.lng], [ne.lat, ne.lng]], { padding: [30, 30] });
+        } else if (polylineCoords && polylineCoords.length > 1) {
+            map.fitBounds(L.latLngBounds(polylineCoords), { padding: [30, 30] });
         }
     }
 
     // --- UPDATE STATE VISUALS ---
+    const STATE_ATTR = { [STATE.IDLE]: 'idle', [STATE.LISTENING]: 'listening',
+                         [STATE.PROCESSING]: 'processing', [STATE.SPEAKING]: 'speaking' };
+
     function applyState(state) {
         if (state === currentState) return;
         currentState = state;
+
+        // Mirror agent state onto <body> so the backdrop grid reacts via
+        // [data-state] CSS selectors. IDLE = no attribute (cascade default).
+        const attr = STATE_ATTR[state];
+        if (state === STATE.IDLE) document.body.removeAttribute('data-state');
+        else if (attr) document.body.setAttribute('data-state', attr);
 
         const color = stateColors[state] || stateColors[STATE.IDLE];
         const colorStr = color.join(', ');
@@ -1186,13 +3223,25 @@
         statusText.textContent = stateLabels[state] || '';
         statusDots.classList.toggle('active', state !== STATE.IDLE);
 
+        // Music panel responds to itunes_play firing during agent turns —
+        // accelerate the music poll so it pops promptly.
+        if (typeof setMusicPollInterval === 'function') {
+            setMusicPollInterval(state === STATE.IDLE ? 10000 : 1500);
+        }
+
         if (state === STATE.IDLE) {
-            btnStop.style.display = 'none';
             btnTalk.disabled = false;
+            btnTalk.classList.remove('interrupting');
             btnTalkLabel.textContent = 'Push to Talk';
+            btnTalk.setAttribute('title', 'Push to Talk');
+            btnTalk.setAttribute('aria-label', 'Push to Talk');
         } else {
-            btnStop.style.display = 'flex';
-            btnTalkLabel.textContent = 'Interrupt';
+            btnTalk.disabled = false;
+            btnTalk.classList.add('interrupting');
+            const activeLabel = state === STATE.LISTENING ? 'Stop' : 'Interrupt';
+            btnTalkLabel.textContent = activeLabel;
+            btnTalk.setAttribute('title', activeLabel);
+            btnTalk.setAttribute('aria-label', activeLabel);
         }
     }
 
@@ -1203,160 +3252,488 @@
         return tmp.textContent || tmp.innerText || '';
     }
 
+    function formatArrival(seconds) {
+        if (!seconds || seconds <= 0) return '--';
+        const arrival = new Date(Date.now() + seconds * 1000);
+        let h = arrival.getHours();
+        const m = String(arrival.getMinutes()).padStart(2, '0');
+        const ampm = h >= 12 ? 'PM' : 'AM';
+        h = h % 12 || 12;
+        return `${h}:${m} ${ampm}`;
+    }
+
+    function formatMiles(meters) {
+        if (!meters || meters <= 0) return '--';
+        const feet = meters * 3.28084;
+        if (feet < 528) return Math.round(feet) + ' ft';
+        return (meters * 0.000621371).toFixed(1) + ' mi';
+    }
+
+    function formatDurationText(seconds) {
+        if (!seconds || seconds <= 0) return '--';
+        if (seconds < 60) return Math.round(seconds) + ' s';
+        const mins = Math.round(seconds / 60);
+        if (mins < 60) return mins + ' mins';
+        const h = Math.floor(mins / 60);
+        const m = mins % 60;
+        return m ? `${h} h ${m} mins` : `${h} h`;
+    }
+
     function renderNavigation(data) {
         if (!data || !data.routes || data.routes.length === 0) return;
 
         const route = data.routes[0];
         if (!route.legs || route.legs.length === 0) return;
-        const leg = route.legs[0];
+        const legs = route.legs;
+        const firstLeg = legs[0];
+        const lastLeg = legs[legs.length - 1];
 
-        // Slide nav panel in (unless manually collapsed)
         if (!navCollapsed) {
-            navPanel.classList.add('active');
+            setNavOpen(true);
         }
 
-        // Render map route
         renderRouteOnMap(data);
-
-        // After panel transition completes, invalidate map size so tiles render correctly
         setTimeout(() => { if (map) map.invalidateSize(); }, 550);
 
-        // Route summary
-        navRouteSummary.classList.add('active');
-        navDuration.textContent = leg.duration ? leg.duration.text : '--';
-        navDistance.textContent = leg.distance ? leg.distance.text : '';
-        navDestination.textContent = leg.end_address || '';
+        const currentSteps = firstLeg.steps || [];
 
-        // Steps
-        const steps = leg.steps || [];
-        if (steps.length === 0) return;
-
-        // Current instruction hero
-        navCurrent.classList.add('active');
-        navCurrentInstruction.textContent = stripHtmlTags(steps[0].html_instructions || '');
-        const d = steps[0].distance ? steps[0].distance.text : '';
-        const t = steps[0].duration ? steps[0].duration.text : '';
-        navCurrentDetail.textContent = [d, t].filter(Boolean).join(' \u00B7 ');
-
-        // Step list
-        let html = '';
-        for (let i = 0; i < steps.length; i++) {
-            const step = steps[i];
+        // Maneuver banner \u2014 large glyph + distance to next + instruction text.
+        // Always reflects the current (first) leg of the route.
+        navManeuver.classList.add('active');
+        if (currentSteps.length > 0) {
+            const step = currentSteps[0];
             const instr = stripHtmlTags(step.html_instructions || '');
-            const dist = step.distance ? step.distance.text : '';
-            const dur = step.duration ? step.duration.text : '';
-            const meta = [dist, dur].filter(Boolean).join(' \u00B7 ');
-            const cls = i === 0 ? ' current-step' : '';
-
-            html += `<div class="nav-step${cls}">
-                <div class="nav-step-num">${i + 1}</div>
-                <div class="nav-step-body">
-                    <div class="nav-step-instruction">${instr}</div>
-                    ${meta ? `<div class="nav-step-meta">${meta}</div>` : ''}
-                </div>
-            </div>`;
+            navManeuverGlyph.innerHTML = maneuverGlyph(step.maneuver, instr);
+            navManeuverDistance.textContent = step.distance ? step.distance.text : '--';
+            navManeuverInstruction.textContent = instr;
+        } else {
+            navManeuverGlyph.innerHTML = MANEUVER_GLYPHS['arrive'];
+            navManeuverDistance.textContent = firstLeg.distance ? firstLeg.distance.text : '--';
+            navManeuverInstruction.textContent = firstLeg.end_address || 'Arrive at destination';
         }
 
-        // Destination marker
-        html += `<div class="nav-step nav-step-destination">
-            <div class="nav-step-num">
-                <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="10" r="3"/><path d="M12 2a8 8 0 0 0-8 8c0 5.4 7 11.5 7.3 11.8a1 1 0 0 0 1.4 0C13 21.5 20 15.4 20 10a8 8 0 0 0-8-8z"/></svg>
-            </div>
+        // ETA strip \u2014 aggregate across all legs so multi-stop trips show the
+        // arrival time at the FINAL destination, not just the next waypoint.
+        const totalDurationSec = legs.reduce((s, l) => s + ((l.duration && l.duration.value) || 0), 0);
+        const totalDistanceM   = legs.reduce((s, l) => s + ((l.distance && l.distance.value) || 0), 0);
+        navBottom.classList.add('active');
+        navEtaArrival.textContent = formatArrival(totalDurationSec);
+        navEtaRemaining.textContent = formatDurationText(totalDurationSec);
+        navEtaDistance.textContent = formatMiles(totalDistanceM);
+        navDestinationSummary.textContent = lastLeg.end_address || '';
+
+        // Multi-stop indicator. Always references the FIRST leg's destination
+        // (the next stop coming up); leg index can advance later when we wire
+        // turn-by-turn progression through waypoints.
+        if (legs.length > 1) {
+            navNextStop.classList.add('active');
+            navNextStopLabel.textContent = `Next stop 1 of ${legs.length}`;
+            navNextStopAddress.textContent = firstLeg.end_address || '';
+        } else {
+            navNextStop.classList.remove('active');
+        }
+
+        // Steps list (rendered into the collapsible sheet). Iterate every leg;
+        // between legs, insert a muted "stop" row naming the waypoint so the
+        // driver can see where each stop sits in the sequence.
+        let html = '';
+        for (let li = 0; li < legs.length; li++) {
+            const leg = legs[li];
+            const steps = leg.steps || [];
+            for (let i = 0; i < steps.length; i++) {
+                const step = steps[i];
+                const instr = stripHtmlTags(step.html_instructions || '');
+                const dist = step.distance ? step.distance.text : '';
+                const dur = step.duration ? step.duration.text : '';
+                const meta = [dist, dur].filter(Boolean).join(' \u00B7 ');
+                const cls = (li === 0 && i === 0) ? ' current-step' : '';
+                html += `<div class="nav-step${cls}">
+                    <div class="nav-step-icon">${maneuverGlyph(step.maneuver, instr)}</div>
+                    <div class="nav-step-body">
+                        <div class="nav-step-instruction">${instr}</div>
+                        ${meta ? `<div class="nav-step-meta">${meta}</div>` : ''}
+                    </div>
+                </div>`;
+            }
+            if (li < legs.length - 1) {
+                html += `<div class="nav-step" style="opacity: 0.75;">
+                    <div class="nav-step-icon">${MANEUVER_GLYPHS['arrive']}</div>
+                    <div class="nav-step-body">
+                        <div class="nav-step-instruction">Stop ${li + 1}</div>
+                        <div class="nav-step-meta">${leg.end_address || ''}</div>
+                    </div>
+                </div>`;
+            }
+        }
+        html += `<div class="nav-step">
+            <div class="nav-step-icon">${MANEUVER_GLYPHS['arrive']}</div>
             <div class="nav-step-body">
                 <div class="nav-step-instruction" style="color: rgba(var(--nav-active), 0.9);">Arrive at destination</div>
-                <div class="nav-step-meta">${leg.end_address || ''}</div>
+                <div class="nav-step-meta">${lastLeg.end_address || ''}</div>
             </div>
         </div>`;
-
         navSteps.innerHTML = html;
     }
 
     // --- PARSE TRANSCRIPT ---
+    // Returns a list of *turns* — one per visible message bubble — with any
+    // preceding Tool blocks folded into `tools[]` on the next assistant turn.
+    // Each turn:
+    //   { role: 'User' | 'Assistant',
+    //     content: string,
+    //     tools: [{ name, content }]   // assistant turns only
+    //   }
+    // A trailing run of Tool blocks (tools that ran but whose assistant text
+    // hasn't started streaming yet) becomes a synthetic pending assistant
+    // turn so the live chips have a place to render.
     function parseMessages(raw) {
         if (!raw || !raw.trim()) return [];
-        const blocks = raw.split('\n\n').filter(b => b.trim());
-        const messages = [];
+        const rawMsgs = [];
+        const roleRe = /^(User|Assistant|System|Tool \(([^)]+)\)):\s*/;
+        const blocks = raw.split('\n\n');
+        let current = null;
+        const flush = () => {
+            if (current && current.role.toLowerCase() !== 'system') rawMsgs.push(current);
+        };
         for (const block of blocks) {
-            const colonIdx = block.indexOf(':');
-            if (colonIdx === -1) continue;
-            const role = block.substring(0, colonIdx).trim();
-            const content = block.substring(colonIdx + 1).trim();
-            if (role.toLowerCase() === 'system') continue;
-            messages.push({ role, content });
+            const trimmed = block.trim();
+            if (!trimmed) continue;
+            const m = trimmed.match(roleRe);
+            if (m) {
+                flush();
+                const baseRole = m[1].startsWith('Tool') ? 'Tool' : m[1];
+                current = {
+                    role: baseRole,
+                    toolName: m[2] || null,
+                    content: trimmed.substring(m[0].length).trim()
+                };
+            } else if (current) {
+                current.content += '\n\n' + trimmed;
+            }
         }
-        return messages;
+        flush();
+
+        // Group: Tool blocks attach to the next Assistant message.
+        const turns = [];
+        let pendingTools = [];
+        for (const m of rawMsgs) {
+            if (m.role === 'Tool') {
+                pendingTools.push({ name: m.toolName || 'tool', content: m.content });
+                continue;
+            }
+            if (m.role === 'Assistant') {
+                turns.push({
+                    role: 'Assistant',
+                    content: m.content,
+                    tools: pendingTools,
+                });
+                pendingTools = [];
+            } else {
+                turns.push({ role: m.role, content: m.content, tools: [] });
+            }
+        }
+        // Tools that ran with no assistant text yet — surface them as a
+        // synthetic pending assistant turn so live chips have a home.
+        if (pendingTools.length) {
+            turns.push({
+                role: 'Assistant',
+                content: '',
+                tools: pendingTools,
+                pending: true,
+            });
+        }
+        return turns;
     }
+
+    // Build a compact signature of a turn so we can decide whether to fully
+    // re-render the children or just patch the last one in place.
+    function turnSignature(t) {
+        const toolNames = (t.tools || []).map(x => x.name).join('|');
+        return `${t.role}::${toolNames}`;
+    }
+
+    let lastTurnSignatures = [];
 
     // --- RENDER CHAT ---
     function renderChat(raw, isStreaming) {
-        const messages = parseMessages(raw);
-        if (messages.length === 0) { emptyState.style.display = 'flex'; return; }
+        const turns = parseMessages(raw);
+        if (turns.length === 0) {
+            emptyState.style.display = 'flex';
+            chatMessages.innerHTML = '';
+            lastTurnSignatures = [];
+            renderedCount = 0;
+            return;
+        }
         emptyState.style.display = 'none';
 
-        for (let i = 0; i < messages.length; i++) {
-            const msg = messages[i];
-            const isAgent = msg.role.toLowerCase() !== 'user';
-            const isLast = i === messages.length - 1;
-            const showCursor = isStreaming && isLast && isAgent;
+        // Decide whether the DOM is still patch-able. Signatures exclude
+        // streamed content, so identical signatures = same structure and we
+        // only need to patch the in-flight bubble's text + cursor. Any other
+        // delta (new turn, tool added, prior-last needs to collapse into a
+        // thoughts panel) → full rebuild. Cheap; transcripts are short.
+        const newSigs = turns.map(turnSignature);
+        const structurallyOk =
+            newSigs.length === lastTurnSignatures.length &&
+            lastTurnSignatures.every((s, i) => s === newSigs[i]);
+
+        if (!structurallyOk) {
+            chatMessages.innerHTML = '';
+            renderedCount = 0;
+        }
+
+        for (let i = 0; i < turns.length; i++) {
+            const turn = turns[i];
+            const isAgent = turn.role.toLowerCase() !== 'user';
+            const isLast = i === turns.length - 1;
+            const turnLive = isStreaming && isLast && isAgent;
+            const showCursor = turnLive && turn.content.length > 0;
 
             if (i < renderedCount) {
-                if (isLast) {
-                    const el = chatMessages.children[i];
-                    if (el) {
-                        const bubble = el.querySelector('.bubble');
-                        if (bubble) {
-                            bubble.textContent = msg.content;
-                            bubble.classList.toggle('typing-cursor', showCursor);
-                        }
-                    }
+                if (isLast && isAgent) {
+                    patchAssistantTurn(chatMessages.children[i], turn, turnLive, showCursor);
                 }
             } else {
-                const wrapper = document.createElement('div');
-                wrapper.className = 'message ' + (isAgent ? 'agent' : 'user');
-
-                const speaker = document.createElement('div');
-                speaker.className = 'speaker';
-                speaker.textContent = msg.role;
-
-                const bubble = document.createElement('div');
-                bubble.className = 'bubble' + (showCursor ? ' typing-cursor' : '');
-                bubble.textContent = msg.content;
-
-                wrapper.appendChild(speaker);
-                wrapper.appendChild(bubble);
-                chatMessages.appendChild(wrapper);
+                const node = isAgent
+                    ? buildAssistantTurn(turn, turnLive, showCursor)
+                    : buildUserTurn(turn);
+                chatMessages.appendChild(node);
             }
         }
 
-        if (messages.length < renderedCount) {
-            chatMessages.innerHTML = '';
-            renderedCount = 0;
-            renderChat(raw, isStreaming);
-            return;
-        }
-
-        renderedCount = messages.length;
-
+        // Strip cursors from any non-last bubbles (safety).
         chatMessages.querySelectorAll('.typing-cursor').forEach(b => {
             if (b.closest('.message') !== chatMessages.lastElementChild) {
                 b.classList.remove('typing-cursor');
             }
         });
 
+        renderedCount = turns.length;
+        lastTurnSignatures = newSigs;
+
         chatScroll.scrollTop = chatScroll.scrollHeight;
+    }
+
+    function buildUserTurn(turn) {
+        const wrapper = document.createElement('div');
+        wrapper.className = 'message user';
+        const speaker = document.createElement('div');
+        speaker.className = 'speaker';
+        speaker.textContent = 'User';
+        const bubble = document.createElement('div');
+        bubble.className = 'bubble';
+        bubble.textContent = turn.content;
+        wrapper.appendChild(speaker);
+        wrapper.appendChild(bubble);
+        return wrapper;
+    }
+
+    function buildAssistantTurn(turn, live, showCursor) {
+        const wrapper = document.createElement('div');
+        wrapper.className = 'message agent';
+
+        const speaker = document.createElement('div');
+        speaker.className = 'speaker';
+        speaker.textContent = 'Assistant';
+        wrapper.appendChild(speaker);
+
+        // Tools surface: live chips while the turn is in flight, collapses
+        // into a "Show thoughts" panel once the turn is done.
+        if (turn.tools && turn.tools.length) {
+            const toolsEl = renderToolsForTurn(turn, live);
+            toolsEl.dataset.sig = toolSurfaceSig(turn, live);
+            wrapper.appendChild(toolsEl);
+        }
+
+        // Skip the bubble entirely while the turn is pending (no text yet);
+        // the live chips speak for themselves.
+        if (turn.content || !turn.pending) {
+            const bubble = document.createElement('div');
+            bubble.className = 'bubble' + (showCursor ? ' typing-cursor' : '');
+            bubble.textContent = turn.content;
+            if (!turn.content && turn.pending) bubble.style.display = 'none';
+            wrapper.appendChild(bubble);
+        }
+
+        return wrapper;
+    }
+
+    // Compact signature of the tool surface for cheap diff: same surface kind
+    // (live vs. thoughts) + same tool sequence + same running/done states.
+    function toolSurfaceSig(turn, live) {
+        const kind = live ? 'live' : 'done';
+        const pending = turn.pending ? 'p' : 'f';
+        const names = (turn.tools || []).map(t => t.name).join('|');
+        return `${kind}::${pending}::${names}`;
+    }
+
+    // Patch the active assistant turn: only rewrite the tool surface when its
+    // signature changes (otherwise we'd reset the spinner / replay the
+    // slide-in animation on every poll), and update the bubble in place.
+    function patchAssistantTurn(el, turn, live, showCursor) {
+        if (!el) return;
+
+        const existingTools = el.querySelector('.live-tools, .thoughts');
+        if (turn.tools && turn.tools.length) {
+            const newSig = toolSurfaceSig(turn, live);
+            if (!existingTools || existingTools.dataset.sig !== newSig) {
+                const fresh = renderToolsForTurn(turn, live);
+                fresh.dataset.sig = newSig;
+                if (existingTools) {
+                    const wasOpen = existingTools.classList.contains('open');
+                    el.replaceChild(fresh, existingTools);
+                    if (wasOpen && fresh.classList.contains('thoughts')) {
+                        fresh.classList.add('open');
+                    }
+                } else {
+                    const speaker = el.querySelector('.speaker');
+                    if (speaker && speaker.nextSibling) {
+                        el.insertBefore(fresh, speaker.nextSibling);
+                    } else {
+                        el.appendChild(fresh);
+                    }
+                }
+            }
+            // Same-signature path: leave DOM (and spinner animation) alone.
+        } else if (existingTools) {
+            existingTools.remove();
+        }
+
+        // Update bubble.
+        let bubble = el.querySelector('.bubble');
+        if (!bubble && turn.content) {
+            bubble = document.createElement('div');
+            bubble.className = 'bubble';
+            el.appendChild(bubble);
+        }
+        if (bubble) {
+            bubble.style.display = (!turn.content && turn.pending) ? 'none' : '';
+            bubble.textContent = turn.content;
+            bubble.classList.toggle('typing-cursor', showCursor);
+        }
+    }
+
+    // Build either the live-chip strip (turn in flight) or the collapsed
+    // thoughts panel (turn finished). Both render the same tool list.
+    function renderToolsForTurn(turn, live) {
+        if (live) {
+            const strip = document.createElement('div');
+            strip.className = 'live-tools';
+            const tools = turn.tools;
+            // All but the last are "done"; the last is "running" only if the
+            // assistant hasn't produced text yet.
+            tools.forEach((t, idx) => {
+                const isLast = idx === tools.length - 1;
+                const running = isLast && turn.pending;
+                const chip = document.createElement('div');
+                chip.className = 'live-tool-chip ' + (running ? 'running' : 'done');
+                chip.innerHTML = `
+                    ${running ? '<span class="chip-spinner" aria-hidden="true"></span>' : '<span class="chip-dot" aria-hidden="true"></span>'}
+                    <span class="chip-label">${running ? 'Running' : 'Ran'}</span>
+                    <span class="chip-name">${escapeHtml(t.name)}</span>
+                `;
+                strip.appendChild(chip);
+            });
+            return strip;
+        }
+
+        // Finished turn — collapsed thoughts panel.
+        const panel = document.createElement('div');
+        panel.className = 'thoughts';
+
+        const header = document.createElement('div');
+        header.className = 'thoughts-header';
+        header.setAttribute('role', 'button');
+        header.setAttribute('tabindex', '0');
+        const toolCount = turn.tools.length;
+        header.innerHTML = `
+            <span class="thoughts-chevron"><svg viewBox="0 0 24 24"><polyline points="9 6 15 12 9 18"/></svg></span>
+            <span class="thoughts-label">Show thoughts</span>
+            <span class="thoughts-count">${toolCount} tool${toolCount === 1 ? '' : 's'}</span>
+        `;
+        header.addEventListener('click', () => panel.classList.toggle('open'));
+        header.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                panel.classList.toggle('open');
+            }
+        });
+        panel.appendChild(header);
+
+        const detail = document.createElement('div');
+        detail.className = 'thoughts-detail';
+
+        const trace = document.createElement('div');
+        trace.className = 'thought-trace-placeholder';
+        trace.textContent = '';
+        detail.appendChild(trace);
+
+        const toolsLabel = document.createElement('div');
+        toolsLabel.className = 'thought-tools-label';
+        toolsLabel.textContent = `Tools used (${toolCount})`;
+        detail.appendChild(toolsLabel);
+
+        turn.tools.forEach(t => {
+            const row = document.createElement('div');
+            row.className = 'thought-tool';
+
+            const rowHeader = document.createElement('div');
+            rowHeader.className = 'thought-tool-header';
+            rowHeader.innerHTML = `
+                <span class="thought-tool-dot"></span>
+                <span class="thought-tool-name">${escapeHtml(t.name)}</span>
+                <span class="thought-tool-expand"><svg viewBox="0 0 24 24"><polyline points="9 6 15 12 9 18"/></svg></span>
+            `;
+            rowHeader.addEventListener('click', () => {
+                if (document.body.getAttribute('data-mode') !== 'dev') return;
+                row.classList.toggle('open');
+            });
+            row.appendChild(rowHeader);
+
+            const result = document.createElement('pre');
+            result.className = 'thought-tool-result';
+            result.textContent = t.content;
+            row.appendChild(result);
+
+            detail.appendChild(row);
+        });
+
+        panel.appendChild(detail);
+        return panel;
+    }
+
+    function escapeHtml(s) {
+        return String(s)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
     }
 
     // --- CANVAS: WAVES + PARTICLES ---
     const canvas = document.getElementById('waveCanvas');
     const ctx = canvas.getContext('2d');
 
-    const canvasSize = 280;
-    const dpr = window.devicePixelRatio || 1;
-    canvas.width = canvasSize * dpr;
-    canvas.height = canvasSize * dpr;
-    canvas.style.width = `${canvasSize}px`;
-    canvas.style.height = `${canvasSize}px`;
-    ctx.scale(dpr, dpr);
+    let canvasSize = 0;
+    let dpr = 0;
+
+    function resizeWaveCanvas() {
+        const wrapper = canvas.parentElement;
+        const nextSize = Math.round((wrapper && wrapper.getBoundingClientRect().width) || 280);
+        const nextDpr = window.devicePixelRatio || 1;
+        if (nextSize === canvasSize && nextDpr === dpr) return;
+
+        canvasSize = nextSize;
+        dpr = nextDpr;
+        canvas.width = Math.round(canvasSize * dpr);
+        canvas.height = Math.round(canvasSize * dpr);
+        canvas.style.width = `${canvasSize}px`;
+        canvas.style.height = `${canvasSize}px`;
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
+    resizeWaveCanvas();
+    window.addEventListener('resize', resizeWaveCanvas);
+    window.addEventListener('orientationchange', resizeWaveCanvas);
 
     let time = 0;
     let targetAmplitude = 5;
@@ -1388,21 +3765,22 @@
     }
 
     function drawWave(peaks, speed, phaseOffset, alpha, radiusOffset) {
-        const cx = canvasSize/2, cy = canvasSize/2, baseR = 70 + radiusOffset;
+        const scale = canvasSize / 280;
+        const cx = canvasSize/2, cy = canvasSize/2, baseR = (70 + radiusOffset) * scale;
         const r = Math.round(currentColor[0]);
         const g = Math.round(currentColor[1]);
         const b = Math.round(currentColor[2]);
 
         ctx.beginPath();
         ctx.strokeStyle = `rgba(${r},${g},${b},${alpha})`;
-        ctx.lineWidth = 1.2;
-        ctx.shadowBlur = 6;
+        ctx.lineWidth = 1.2 * scale;
+        ctx.shadowBlur = 6 * scale;
         ctx.shadowColor = `rgba(${r},${g},${b},${alpha*0.5})`;
 
         for (let a = 0; a <= Math.PI*2; a += 0.02) {
             const noise = Math.sin(a*peaks + time*speed + phaseOffset)
                         * Math.cos(a*(peaks/2) - time*(speed/2));
-            const rad = baseR + Math.abs(noise)*currentAmplitude;
+            const rad = baseR + Math.abs(noise)*currentAmplitude*scale;
             const x = cx + rad*Math.cos(a);
             const y = cy + rad*Math.sin(a);
             if (a === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
@@ -1413,6 +3791,7 @@
     }
 
     function drawParticles() {
+        const scale = canvasSize / 280;
         const cx = canvasSize/2, cy = canvasSize/2;
         const r = Math.round(currentColor[0]);
         const g = Math.round(currentColor[1]);
@@ -1424,18 +3803,19 @@
             if (p.opacity >= 1) { p.opacity = 1; p.fadeDir = -1; }
             if (p.opacity <= 0) { p.opacity = 0; p.fadeDir = 1; }
 
-            const x = cx + (p.radius + currentAmplitude*0.3) * Math.cos(p.angle);
-            const y = cy + (p.radius + currentAmplitude*0.3) * Math.sin(p.angle);
+            const radius = (p.radius + currentAmplitude*0.3) * scale;
+            const x = cx + radius * Math.cos(p.angle);
+            const y = cy + radius * Math.sin(p.angle);
 
             ctx.beginPath();
-            ctx.arc(x, y, p.size, 0, Math.PI*2);
+            ctx.arc(x, y, p.size * scale, 0, Math.PI*2);
             ctx.fillStyle = `rgba(${r},${g},${b},${p.opacity*0.4})`;
             ctx.fill();
         }
     }
 
     function animate() {
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.clearRect(0, 0, canvasSize, canvasSize);
         time += 0.025;
         currentAmplitude += (targetAmplitude - currentAmplitude) * 0.06;
         currentColor = lerpColor(currentColor, targetColor, 0.04);
@@ -1452,6 +3832,7 @@
     // --- POLLING: transcript ---
     let pollInterval = 300;
     let pollTimer = null;
+    let wasStreaming = false;
 
     function pollTranscript() {
         fetch('/api/transcript?t=' + Date.now())
@@ -1471,16 +3852,62 @@
             })
             .then(text => {
                 const isStreaming = currentState === STATE.PROCESSING || currentState === STATE.SPEAKING;
-                if (text !== lastRawTranscript || isStreaming) {
+                // Also force one render on the streaming→idle transition so
+                // any live tool chips collapse into the thoughts panel even
+                // if the transcript text is unchanged.
+                const streamingEnded = wasStreaming && !isStreaming;
+                if (text !== lastRawTranscript || isStreaming || streamingEnded) {
                     lastRawTranscript = text;
                     renderChat(text, isStreaming);
                 }
+                wasStreaming = isStreaming;
             })
             .catch(console.error);
     }
 
     pollTimer = setInterval(pollTranscript, pollInterval);
     pollTranscript();
+
+    // --- POLLING: location ---
+    // Updates the bottom-bar location chip and re-centers the map (if not
+    // already showing a route) whenever the cached location changes.
+    let lastLocationJson = '';
+    function pollLocation() {
+        fetch('/api/location?t=' + Date.now())
+            .then(r => {
+                if (r.status === 204 || !r.ok) return null;
+                return r.text();
+            })
+            .then(text => {
+                if (!text || text === lastLocationJson) return;
+                lastLocationJson = text;
+                let loc;
+                try { loc = JSON.parse(text); } catch (e) { return; }
+                if (typeof loc.latitude !== 'number' || typeof loc.longitude !== 'number') return;
+
+                currentLocation = loc;
+
+                // Update the location chip — show "City, ST" when we can
+                // parse a US state out of the geocoded address, otherwise
+                // fall back to the city alone (or coordinates).
+                const chipText = formatLocationChip(loc);
+                document.getElementById('chip-location-value').textContent = chipText;
+
+                // If the map exists and there's no route currently rendered,
+                // re-center on the new location. (When a route IS active, we
+                // leave the route's bounds as the active framing.)
+                if (map && !lastNavJson) {
+                    map.setView([loc.latitude, loc.longitude], 12);
+                }
+                drawLocationMarker();
+            })
+            .catch(() => {});
+    }
+
+    // Refresh every 30s — fast enough to follow a moving vehicle once
+    // get_location is wired to real GPS, slow enough to be ipapi-friendly.
+    setInterval(pollLocation, 30000);
+    pollLocation();
 
     // --- POLLING: navigation ---
     function pollNavigation() {
@@ -1545,39 +3972,71 @@
         }
     }
 
-    // --- POLLING: music ---
+    // --- MUSIC. Frontend polls /api/music; backend lazy-refreshes the
+    // iTunes/Apple Music tool at most once per ~15s (only when the UI is
+    // actually being read). Net rate: ≤4 MCP calls/min while the page is
+    // open; zero when it isn't. ---
+    let lastMusicState = '';
+    function applyPlayState(state) {
+        const paused = (state === 'paused');
+        musicPanel.classList.toggle('paused', paused);
+        document.getElementById('music-icon-play').style.display = paused ? '' : 'none';
+        document.getElementById('music-icon-pause').style.display = paused ? 'none' : '';
+        document.getElementById('music-header-label').textContent = paused ? 'Paused' : 'Now Playing';
+    }
+
     function pollMusic() {
+        let state = '';
         fetch('/api/music?t=' + Date.now())
             .then(r => {
                 if (r.status === 204 || !r.ok) {
                     if (lastMusicText) {
                         lastMusicText = '';
+                        lastMusicState = '';
                         musicCollapsed = false;  // Reset so next track reopens
-                        musicPanel.classList.remove('active');
+                        setMusicOpen(false);
+                        musicPanel.classList.remove('paused');
                         applyArtwork(null);
+                        // Music chip falls back to its icon-only idle state.
+                        const chipVal = document.getElementById('chip-music-value');
+                        const chipEl  = document.getElementById('chip-music');
+                        if (chipVal) chipVal.textContent = '';
+                        if (chipEl)  chipEl.classList.add('empty');
                     }
                     return null;
                 }
+                state = r.headers.get('X-Music-State') || 'playing';
                 return r.text();
             })
             .then(text => {
-                if (!text || text === lastMusicText) return;
+                if (!text) return;
+                if (state !== lastMusicState) {
+                    applyPlayState(state);
+                    lastMusicState = state;
+                }
+                if (text === lastMusicText) return;
                 lastMusicText = text;
 
-                // Parse: MCP tool returns "Name: X, Artist: Y, Album: Z" or "X - Y - Z" or plain text
+                // Parse one of:
+                //   "Now playing: <track> by <artist> from <album>"   (mcp-applemusic)
+                //   "Name: X, Artist: Y, Album: Z"
+                //   "Track - Artist - Album"
                 let track = text, artist = '', album = '';
 
-                // Try "Name: ..., Artist: ..., Album: ..." format
+                const nowPlaying = text.match(/^\s*Now playing:\s*(.+?)\s+by\s+(.+?)\s+from\s+(.+?)\s*$/i);
                 const nameMatch = text.match(/(?:Name|Track):\s*(.+?)(?:,\s*Artist:|$)/i);
                 const artistMatch = text.match(/Artist:\s*(.+?)(?:,\s*Album:|$)/i);
                 const albumMatch = text.match(/Album:\s*(.+?)$/i);
 
-                if (nameMatch) {
+                if (nowPlaying) {
+                    track = nowPlaying[1].trim();
+                    artist = nowPlaying[2].trim();
+                    album = nowPlaying[3].trim();
+                } else if (nameMatch) {
                     track = nameMatch[1].trim();
                     artist = artistMatch ? artistMatch[1].trim() : '';
                     album = albumMatch ? albumMatch[1].trim() : '';
                 } else if (text.includes(' - ')) {
-                    // Try "Track - Artist - Album" format
                     const parts = text.split(' - ').map(s => s.trim());
                     track = parts[0] || text;
                     artist = parts[1] || '';
@@ -1587,25 +4046,55 @@
                 musicTrack.textContent = track;
                 musicArtist.textContent = [artist, album].filter(Boolean).join(' \u2022 ') || '';
                 if (!musicCollapsed) {
-                    musicPanel.classList.add('active');
+                    setMusicOpen(true);
                 }
+                // Mirror the track on the bottom-bar chip so the music button
+                // doubles as a "now playing" glance.
+                const chipVal = document.getElementById('chip-music-value');
+                const chipEl  = document.getElementById('chip-music');
+                if (chipVal) chipVal.textContent = track || '';
+                if (chipEl)  chipEl.classList.toggle('empty', !track);
                 fetchAlbumArt(track, artist, album);
             })
             .catch(() => {});
     }
 
-    setInterval(pollMusic, 3000);
+    // --- MUSIC TRANSPORT BUTTONS ---
+    function musicAction(action) {
+        fetch('/api/music/' + action, { method: 'POST' })
+            .then(() => setTimeout(pollMusic, 250))
+            .catch(console.error);
+    }
+    document.getElementById('music-prev').addEventListener('click', () => musicAction('previous'));
+    document.getElementById('music-next').addEventListener('click', () => musicAction('next'));
+    document.getElementById('music-play-pause').addEventListener('click', () => {
+        // Optimistic toggle so the icon flips before the round trip; the next
+        // poll reconciles with the backend's actual play_state.
+        const paused = musicPanel.classList.contains('paused');
+        musicAction(paused ? 'play' : 'pause');
+    });
+
+    // Adaptive cadence: while the agent is active (LISTENING/PROCESSING/SPEAKING)
+    // we poll fast so the panel pops within ~1s of itunes_play; otherwise idle
+    // poll. Backend lazy-refresh still bounds MCP calls to ~1 per 15s.
+    let musicPollTimer = null;
+    let musicPollInterval = 0;
+    function setMusicPollInterval(ms) {
+        if (ms === musicPollInterval) return;
+        if (musicPollTimer) clearInterval(musicPollTimer);
+        musicPollTimer = setInterval(pollMusic, ms);
+        musicPollInterval = ms;
+    }
+    setMusicPollInterval(10000);
     pollMusic();
 
     // --- POLLING: climate ---
     function renderClimate(data) {
         climateWidget.classList.add('active');
 
-        // Temperature
+        // Interior AC setpoint (climate widget only — outdoor weather chip is
+        // driven by /api/weather, populated by the `weather` tool).
         climateTemp.innerHTML = data.temperature + '&deg;';
-
-        // Also update the temp chip on the left
-        document.getElementById('chip-temp-value').textContent = data.temperature;
 
         // Fan speed bars (1-5)
         const bars = climateFan.querySelectorAll('span');
@@ -1639,15 +4128,65 @@
     setInterval(pollClimate, 3000);
     pollClimate();
 
-    // --- VOICE SELECTOR (proxied through backend to avoid CORS) ---
-    const voiceSelector = document.getElementById('voice-selector');
-    const voiceSelect = document.getElementById('voice-select');
+    // --- WEATHER (read-only snapshot; the value only changes when the agent
+    // calls the `weather` tool, so this poll just picks up cached state at a
+    // slow cadence — there is no periodic backend fetch). ---
+    let lastWeatherJson = '';
+    function pollWeather() {
+        fetch('/api/weather?t=' + Date.now())
+            .then(r => {
+                if (r.status === 204 || !r.ok) return null;
+                return r.text();
+            })
+            .then(text => {
+                if (!text || text === lastWeatherJson) return;
+                lastWeatherJson = text;
+                try {
+                    const data = JSON.parse(text);
+                    if (typeof data.temperature === 'number') {
+                        setWeatherTempDisplay(data.temperature, data.units);
+                    }
+                } catch (e) {}
+            })
+            .catch(() => {});
+    }
+    setInterval(pollWeather, 60000);
+    pollWeather();
+
+    // --- VOICE SELECTOR (lives inside the settings panel; proxied through
+    // the backend to avoid CORS). Section is always visible so the user can
+    // see *why* there's no dropdown (loading / empty / backend unreachable).
+    const voiceSection = document.getElementById('settings-voice-section');
+    const voiceSelect  = document.getElementById('voice-select');
+    const voiceHint    = document.getElementById('voice-hint');
+
+    function setVoiceState(text, enabled) {
+        if (voiceHint) voiceHint.textContent = text;
+        voiceSelect.disabled = !enabled;
+    }
+
+    // Some TTS backends return a bare array; others wrap it in an object.
+    function normalizeVoices(payload) {
+        if (Array.isArray(payload)) return payload;
+        if (payload && Array.isArray(payload.voices)) return payload.voices;
+        return [];
+    }
 
     function loadVoices() {
-        fetch('/api/voices')
-            .then(r => r.json())
-            .then(voices => {
-                if (!voices || voices.length === 0) return;
+        Promise.all([
+            fetch('/api/voices').then(r => {
+                if (!r.ok) throw new Error('voices HTTP ' + r.status);
+                return r.json();
+            }),
+            fetch('/api/currentVoice').then(r => r.ok ? r.json() : null).catch(() => null),
+        ])
+            .then(([payload, current]) => {
+                const voices = normalizeVoices(payload);
+                if (voices.length === 0) {
+                    console.warn('[voices] backend returned empty list:', payload);
+                    setVoiceState('TTS backend exposes no selectable voices.', false);
+                    return;
+                }
                 voiceSelect.innerHTML = '';
                 voices.sort();
                 for (const v of voices) {
@@ -1665,14 +4204,15 @@
                     }
                     voiceSelect.appendChild(opt);
                 }
-                // Select hfc_female by default
-                const defaultVoice = voices.find(v => v.toLowerCase().includes('hfc_female'));
-                if (defaultVoice) {
-                    voiceSelect.value = defaultVoice;
+                if (current && current.voice && voices.includes(current.voice)) {
+                    voiceSelect.value = current.voice;
                 }
-                voiceSelector.style.display = 'flex';
+                setVoiceState('Voice used for spoken responses.', true);
             })
-            .catch(() => { /* TTS not available */ });
+            .catch((err) => {
+                console.warn('[voices] load failed:', err);
+                setVoiceState('Voice list unavailable (TTS unreachable or backend doesn’t expose voices).', false);
+            });
     }
 
     voiceSelect.addEventListener('change', () => {
@@ -1685,6 +4225,50 @@
     });
 
     loadVoices();
+
+    // --- CHAT INPUT ---
+    const controlsBar = document.querySelector('.controls-bar');
+    const chatInput = document.getElementById('chat-input');
+    const chatInputBox = document.getElementById('chat-input-box');
+    function autoResize() {
+        chatInputBox.style.height = 'auto';
+        chatInputBox.style.height = Math.min(chatInputBox.scrollHeight, 80) + 'px';
+    }
+    chatInput.addEventListener('click', () => chatInputBox.focus());
+    chatInput.addEventListener('focusin', () => {
+        if (controlsBar) controlsBar.classList.add('chat-focused');
+    });
+    chatInput.addEventListener('focusout', () => {
+        if (controlsBar) controlsBar.classList.remove('chat-focused');
+    });
+    chatInputBox.addEventListener('input', autoResize);
+    chatInputBox.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            const text = chatInputBox.value;
+            if (!text.trim() || chatInputBox.disabled) return;
+            sendText(text);
+            chatInputBox.value = '';
+            autoResize();
+        }
+    });
+    let chatInputWasDisabled = false;
+    let chatInputHadFocusBeforeDisable = false;
+    function refreshChatInputEnabled() {
+        const disabled = (currentState !== STATE.IDLE);
+        if (disabled && !chatInputWasDisabled) {
+            chatInputHadFocusBeforeDisable = (document.activeElement === chatInputBox);
+        }
+        chatInputBox.disabled = disabled;
+        chatInput.classList.toggle('disabled', disabled);
+        // Restore focus when the box re-enables, but only if the user had actually been
+        // typing here before it got disabled (PTT etc. shouldn't auto-expand the box).
+        if (chatInputWasDisabled && !disabled && chatInputHadFocusBeforeDisable && document.activeElement === document.body) {
+            chatInputBox.focus();
+        }
+        chatInputWasDisabled = disabled;
+    }
+    setInterval(refreshChatInputEnabled, 200);
     </script>
 </body>
 </html>

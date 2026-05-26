@@ -4,7 +4,7 @@
  * @version 0.1
  * @date 2025-07-20
  *
- * @copyright Copyright (c) 2025 Edge AI, LLC. All rights reserved.
+ * @copyright Copyright (c) 2026 Edge AI, LLC. All rights reserved.
  *
  */
 #pragma once
@@ -15,9 +15,16 @@
 #include <functional>
 #include <memory>
 #include <optional>
+#include <stdexcept>
 #include <vector>
 
 namespace agents {
+
+// Recoverable per-turn LLM failure (e.g. the model produced malformed
+// tool-call JSON the provider couldn't parse). Today only Ollama raises it.
+class LLMRetryableTurnError : public std::runtime_error {
+    using std::runtime_error::runtime_error;
+};
 
 /**
  * @brief Options for LLM API calls
@@ -60,6 +67,20 @@ struct LLMOptions {
      * @note Use "application/json" for JSON output, "text/x.enum" for enum output
      */
     std::optional<std::string> response_mime_type;
+    /**
+     * @brief Reasoning effort for thinking-capable models.
+     *
+     * Accepted values: "low", "medium", "high". Mapped per provider:
+     *   - Ollama (gpt-oss): sets `think` to the level string (Reasoning: low|medium|high in template).
+     *   - OpenAI (o1/o3/o4-mini/gpt-5): sets `reasoning_effort` API field.
+     *   - Anthropic (Claude 4.x with extended thinking): sets `thinking.budget_tokens`
+     *     using a level→budget mapping (low=1024, medium=4096, high=16384).
+     *   - Google (Gemini): no equivalent yet; ignored.
+     *
+     * If unset (nullopt): Ollama defaults to `think: true` (model default level + channel split);
+     * other providers don't send any reasoning param.
+     */
+    std::optional<std::string> reasoning_effort;
 };
 
 /**

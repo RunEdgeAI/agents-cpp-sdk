@@ -4,13 +4,17 @@
  * @version 0.1
  * @date 2025-11-20
  *
- * @copyright Copyright (c) 2025 Edge AI, LLC. All rights reserved.
+ * @copyright Copyright (c) 2026 Edge AI, LLC. All rights reserved.
  *
  */
 #pragma once
 
 #include <agents-cpp/agents/autonomous_agent.h>
 #include <agents-cpp/http_client.h>
+
+#include <atomic>
+#include <memory>
+#include <thread>
 
 namespace agents {
 
@@ -112,6 +116,13 @@ public:
     void listen();
 
     /**
+     * @brief Inject a user message into the agent reasoning loop, bypassing STT.
+     * @param text User-provided text (typed)
+     * @param speak If true, stream the response through TTS as well
+     */
+    void submitText(const std::string& text, bool speak = true);
+
+    /**
      * @brief Stop the voice agent
      */
     void stop() override;
@@ -128,9 +139,28 @@ public:
      */
     void setState(State state);
 
+    /**
+     * @brief Getter for STT connected status
+     *
+     * @return true     is connected
+     * @return false    not connected
+     */
+    bool isSTTConnected() const;
+
+    /**
+     * @brief Getter for TTS connected status
+     *
+     * @return true     is connected
+     * @return false    not connected
+     */
+    bool isTTSConnected() const;
+
     /// Callbacks for voice agent events
     Callbacks cb_;
 private:
+    struct ServerState;
+    using ServerHandle = std::unique_ptr<ServerState>;
+
     /**
      * @brief The agent state
      */
@@ -142,7 +172,7 @@ private:
     /**
      * @brief This Agent's Endpoint Server
      */
-    httplib::Server http_server_;
+    ServerHandle server_;
     /**
      * @brief Speech-to-text Endpoint Client
      */
@@ -157,6 +187,15 @@ private:
     std::thread server_thread_;
 
     /**
+     * @brief Tracks last known reachability of TTS endpoint. Used to log only on transitions.
+     */
+    std::atomic<bool> tts_connected_{true};
+    /**
+     * @brief Tracks last known reachability of STT endpoint. Used to log only on transitions.
+     */
+    std::atomic<bool> stt_connected_{true};
+
+    /**
      * @brief Handle STT events received from the STT service
      * @param eventJson The event JSON object
      */
@@ -165,93 +204,20 @@ private:
      * @brief Send a request to the TTS service
      * @param api The TTS api
      * @param request The request body
+     * @return true if the request succeeded, false otherwise
      */
-    void requestTTS(const std::string& api, const std::string& request);
+    bool requestTTS(const std::string& api, const std::string& request);
     /**
      * @brief Send a request to the STT service
      * @param api The STT api
      * @param request The request body
+     * @return true if the request succeeded, false otherwise
      */
-    void requestSTT(const std::string& api, const std::string& request);
+    bool requestSTT(const std::string& api, const std::string& request);
+    /**
+     * @brief Probe the STT and TTS /health endpoints and log a warning if either is unreachable.
+     */
+    void checkServiceHealth();
 };
-
-/**
- * @brief Run a simple web UI for a VoiceAgent
- * @param media_dir The media directory containing the UI files
- * @param svr The HTTP server
- * @param agent The VoiceAgent
- */
-__attribute__((unused))
-static void runUI(const std::string& media_dir, httplib::Server& svr, VoiceAgent& agent) {
-    // Shared state for streaming partial responses to UI
-    std::mutex partial_mutex;
-    std::string current_partial;
-
-    // 1. SERVE THE UI
-    svr.Get("/", [&](const httplib::Request&, httplib::Response& res) {
-        std::string html = Utils::loadHtmlFile(media_dir);
-        res.set_content(html, "text/html");
-    });
-
-    // 2. THE TRIGGER API
-    svr.Post("/api/trigger", [&agent](const httplib::Request&, httplib::Response& res) {
-        Logger::info("[Backend] Agent triggered via Web UI!");
-        agent.listen();
-        res.set_content("OK", "text/plain");
-    });
-
-    // 3. THE TRANSCRIPT API
-    svr.Get("/api/transcript", [&agent, &partial_mutex, &current_partial](const httplib::Request&, httplib::Response& res) {
-        auto state = agent.getState();
-        std::string state_str;
-
-        switch (state) {
-            case VoiceAgent::State::LISTENING: state_str = "1"; break;
-            case VoiceAgent::State::PROCESSING: state_str = "2"; break;
-            case VoiceAgent::State::SPEAKING: state_str = "3"; break;
-            default: state_str = "0"; break;
-        }
-
-        std::string summary;
-        auto context = agent.getContext();
-        if (context && context->getMemory()) {
-            summary = context->getMemory()->getConversationSummary();
-        }
-
-        // Append streaming partial if available
-        {
-            std::lock_guard<std::mutex> lock(partial_mutex);
-            if (!current_partial.empty()) {
-                summary += "Assistant: " + current_partial + "\n\n";
-            }
-        }
-
-        res.set_header("X-Voice-Status", state_str);
-        res.set_content(summary, "text/plain");
-    });
-
-    // 4. THE STOP API
-    svr.Post("/api/stop", [&agent](const httplib::Request&, httplib::Response& res) {
-        // This stops audio playback and clears the LLM generation queue
-        Logger::info("[Backend] Stop requested via Web UI!");
-        agent.stop();
-        res.set_content("OK", "text/plain");
-    });
-
-    // 5. Hook callbacks for streaming partial responses to the UI
-    agent.cb_.onPartialResponse = [&](const std::string& chunk) {
-        std::lock_guard<std::mutex> lock(partial_mutex);
-        current_partial += chunk;
-    };
-
-    agent.cb_.onFinalResponse = [&](const std::string& text) {
-        std::lock_guard<std::mutex> lock(partial_mutex);
-        (void)text;
-        current_partial.clear();
-    };
-
-    Logger::info("UI server listening on http://localhost:9000");
-    svr.listen("0.0.0.0", 9000);
-}
 
 } // namespace agents

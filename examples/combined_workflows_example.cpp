@@ -1,13 +1,13 @@
 /**
- * @example actor_agent_example.cpp
- * @brief Actor Agent Example
+ * @example combined_workflows_example.cpp
+ * @brief End-to-end tour: prompt chaining + parallelization + autonomous agent with tools.
  * @version 0.1
  * @date 2025-07-20
  *
- * @copyright Copyright (c) 2025 Edge AI, LLC. All rights reserved.
+ * @copyright Copyright (c) 2026 Edge AI, LLC. All rights reserved.
  *
  */
-#include <agents-cpp/agents/actor_agent.h>
+#include <agents-cpp/agents/autonomous_agent.h>
 #include <agents-cpp/config_loader.h>
 #include <agents-cpp/logger.h>
 #include <agents-cpp/tool.h>
@@ -207,10 +207,10 @@ int main(int argc, char* argv[]) {
 
         Logger::info("Parallelization result: {}", result.dump(2));
 
-        // Example 3: Using the actor agent
-        Logger::info("\n=== Example 3: Actor Agent with Tools ===\n\n");
+        // Example 3: Using the autonomous agent with tools
+        Logger::info("\n=== Example 3: Autonomous Agent with Tools ===\n\n");
 
-        auto agent = std::make_shared<ActorAgent>(context);
+        auto agent = std::make_shared<AutonomousAgent>(context);
 
         // Set agent prompt
         agent->setAgentPrompt(

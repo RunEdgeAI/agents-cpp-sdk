@@ -2,14 +2,11 @@
 MODULE.bazel
 This file declares external dependencies using Bazel bzlmod.
 """
-module(name = "agents", version = "1.6.1")
+module(name = "agents", version = "1.6.9")
 
 # Core C++ rules
 bazel_dep(name = "platforms", version = "1.1.0")
-bazel_dep(name = "rules_cc", version = "0.2.17")
-
-# HTTP library
-bazel_dep(name = "cpp-httplib", version = "0.16.3.bzl.1")
+bazel_dep(name = "rules_cc", version = "0.2.18")
 
 # JSON library
 bazel_dep(name = "nlohmann_json", version = "3.11.3")

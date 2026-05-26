@@ -4,7 +4,7 @@
  * @version 0.1
  * @date 2025-07-20
  *
- * @copyright Copyright (c) 2025 Edge AI, LLC. All rights reserved.
+ * @copyright Copyright (c) 2026 Edge AI, LLC. All rights reserved.
  *
  */
 #pragma once
@@ -129,6 +129,13 @@ public:
      * @return The result of the tool execution
      */
     virtual ToolResult execute(const JsonObject& params) const;
+
+    /**
+     * @brief Score the relevance of this tool to a given query
+     * @param query The query to score against
+     * @return double Relevance score (0.0 to 1.0)
+     */
+    virtual double scoreRelevance(const std::string& query) const;
 
     /**
      * @brief Validate parameters against schema

@@ -4,7 +4,7 @@
  * @version 0.4
  * @date 2025-12-07
  *
- * @copyright Copyright (c) 2025 Edge AI, LLC. All rights reserved.
+ * @copyright Copyright (c) 2026 Edge AI, LLC. All rights reserved.
  */
 #ifndef AGENTS_CPP_TOOLS_WEB_SEARCH_TOOL_H
 #define AGENTS_CPP_TOOLS_WEB_SEARCH_TOOL_H

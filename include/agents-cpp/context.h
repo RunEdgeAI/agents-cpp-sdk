@@ -4,7 +4,7 @@
  * @version 0.1
  * @date 2025-07-20
  *
- * @copyright Copyright (c) 2025 Edge AI, LLC. All rights reserved.
+ * @copyright Copyright (c) 2026 Edge AI, LLC. All rights reserved.
  *
  */
 #pragma once
@@ -114,6 +114,12 @@ public:
     using OnBeforeToolExecutionCallback = std::function<void(const std::string& tool_name, const JsonObject& params)>;
 
     /**
+     * @brief Callback type for after tool execution
+     * @note Fired with the actual result so observers can react to outcomes
+     */
+    using OnAfterToolExecutionCallback = std::function<void(const std::string& tool_name, const JsonObject& params, ToolResult& result)>;
+
+    /**
      * @brief Callback type for before prompt assembly
      */
     using OnBeforePromptAssemblyCallback = std::function<void(std::vector<Message>& messages)>;
@@ -128,6 +134,12 @@ public:
      * @param callback The callback to execute
      */
     void setOnBeforeToolExecution(OnBeforeToolExecutionCallback callback);
+
+    /**
+     * @brief Set the onAfterToolExecution callback
+     * @param callback The callback to execute after a tool returns
+     */
+    void setOnAfterToolExecution(OnAfterToolExecutionCallback callback);
 
     /**
      * @brief Set the onBeforePromptAssembly callback
@@ -171,6 +183,15 @@ public:
      * @return The tools
      */
     std::vector<std::shared_ptr<Tool>> getTools() const;
+
+    /**
+     * @brief Remove a tool from the catalog the agent sees
+     * @param name The name of the tool to remove
+     * @note Callers holding a shared_ptr to the tool (obtained via getTool)
+     * can still invoke it directly; this only removes it from the catalog
+     * advertised to the model.
+     */
+    void removeTool(const std::string& name);
 
     /**
      * @brief Execute a tool by name using coroutines
@@ -261,6 +282,11 @@ private:
      * @brief Callback for before tool execution
      */
     OnBeforeToolExecutionCallback onBeforeToolExecution_ = nullptr;
+
+    /**
+     * @brief Callback for after tool execution
+     */
+    OnAfterToolExecutionCallback onAfterToolExecution_ = nullptr;
 
     /**
      * @brief Callback for before prompt assembly

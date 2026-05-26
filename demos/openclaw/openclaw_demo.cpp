@@ -13,7 +13,7 @@
  * Behaviour, memory, and skills are plain Markdown files in .agents/ —
  * edit them without recompiling.
  *
- * @copyright Copyright (c) 2025 Edge AI, LLC. All rights reserved.
+ * @copyright Copyright (c) 2026 Edge AI, LLC. All rights reserved.
  */
 #include <agents-cpp/agents/autonomous_agent.h>
 #include <agents-cpp/config_loader.h>

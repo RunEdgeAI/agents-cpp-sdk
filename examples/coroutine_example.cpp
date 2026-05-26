@@ -4,7 +4,7 @@
  * @version 0.1
  * @date 2025-07-20
  *
- * @copyright Copyright (c) 2025 Edge AI, LLC. All rights reserved.
+ * @copyright Copyright (c) 2026 Edge AI, LLC. All rights reserved.
  *
  */
 #include <agents-cpp/agents/autonomous_agent.h>
@@ -183,7 +183,6 @@ int main(int argc, char* argv[]) {
     // Register tools
     context->registerTool(tools::createWikipediaTool());
     context->registerTool(tools::createWebSearchTool(llm));
-    context->registerTool(tools::createSummarizationTool(llm));
 
     // Menu-driven example to demonstrate various coroutines
     while (true) {

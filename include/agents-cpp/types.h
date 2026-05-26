@@ -4,7 +4,7 @@
  * @version 0.1
  * @date 2025-07-20
  *
- * @copyright Copyright (c) 2025 Edge AI, LLC. All rights reserved.
+ * @copyright Copyright (c) 2026 Edge AI, LLC. All rights reserved.
  *
  */
 #pragma once
@@ -57,6 +57,22 @@ struct Parameter {
      * @brief The default value of the parameter
      */
     std::optional<JsonObject> default_value = std::nullopt;
+    /**
+     * @brief Element schema for `type: "array"` parameters
+     * @note Required by some providers (e.g. Gemini). Defaults to
+     * `{"type": "string"}` when ingested from a source schema that omits it.
+     */
+    std::optional<JsonObject> items = std::nullopt;
+    /**
+     * @brief Nested property schema for `type: "object"` parameters
+     * @note Captured from the source JSON schema's `properties` field.
+     */
+    std::optional<JsonObject> properties = std::nullopt;
+    /**
+     * @brief Allowed enum values for the parameter
+     * @note Captured from the source JSON schema's `enum` field.
+     */
+    std::optional<JsonObject> enum_values = std::nullopt;
 };
 
 /**
@@ -66,10 +82,58 @@ struct Parameter {
 using ParameterMap = std::map<std::string, Parameter>;
 
 /**
- * @brief Tool calls type
- * @note This is a tool calls type. It contains the tool name and parameters.
+ * @brief A single tool call emitted by an LLM.
+ * @note `id` is the call identifier returned by the LLM. It must be echoed
+ * back in the matching tool-result message's `tool_call_id` so the model can
+ * thread results to calls. Some providers (e.g. Gemini) don't return an id;
+ * adapters synthesize one (e.g. "call_<n>") in that case.
  */
-using ToolCalls = std::vector<std::pair<std::string, JsonObject>>;
+struct ToolCall {
+    /**
+     * @brief tool id.
+     */
+    std::string id;
+    /**
+     * @brief tool name.
+     */
+    std::string name;
+    /**
+     * @brief tool arguments.
+     */
+    JsonObject arguments;
+    /**
+     * @brief Opaque provider-specific token that must round-trip with the
+     * tool call when echoed back to the LLM in subsequent turns.
+     * @note Currently only populated by Gemini (`thoughtSignature`). Other
+     * adapters leave it empty and ignore it on serialization.
+     */
+    std::string signature;
+
+    ToolCall() = default;
+    /**
+     * @brief Construct a new Tool Call object
+     * @param id_        tool id.
+     * @param name_      tool name.
+     * @param arguments_ tool args.
+     */
+    ToolCall(std::string id_, std::string name_, JsonObject arguments_)
+        : id(std::move(id_)), name(std::move(name_)), arguments(std::move(arguments_)) {}
+    /**
+     * @brief Construct a new Tool Call object
+     * @param id_        tool id.
+     * @param name_      tool name.
+     * @param arguments_ tool args.
+     * @param signature_ tool signature.
+     */
+    ToolCall(std::string id_, std::string name_, JsonObject arguments_, std::string signature_)
+        : id(std::move(id_)), name(std::move(name_)),
+          arguments(std::move(arguments_)), signature(std::move(signature_)) {}
+};
+
+/**
+ * @brief Tool calls type — a vector of ToolCall entries.
+ */
+using ToolCalls = std::vector<ToolCall>;
 
 /**
  * @brief Response from an LLM
@@ -142,7 +206,7 @@ struct Message {
     /**
      * @brief The tool calls that were made
      */
-    std::vector<std::pair<std::string, JsonObject>> tool_calls = {};
+    ToolCalls tool_calls = {};
 };
 
 /**

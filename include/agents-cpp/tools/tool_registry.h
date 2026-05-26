@@ -4,7 +4,7 @@
  * @version 0.1
  * @date 2025-07-20
  *
- * @copyright Copyright (c) 2025 Edge AI, LLC. All rights reserved.
+ * @copyright Copyright (c) 2026 Edge AI, LLC. All rights reserved.
  *
  */
 #pragma once
@@ -83,6 +83,15 @@ public:
      * @param llm Optional LLM interface for tools that require it
      * @param mcpConfig Optional config of the MCP server
      */
+    void registerMinimalTools(const std::shared_ptr<LLMInterface> llm = nullptr,
+        const std::vector<mcpConfig> mcpConfig = {});
+
+    /**
+     * @brief Create and register standard tools
+     *
+     * @param llm Optional LLM interface for tools that require it
+     * @param mcpConfig Optional config of the MCP server
+     */
     void registerStandardTools(const std::shared_ptr<LLMInterface> llm = nullptr,
         const std::vector<mcpConfig> mcpConfig = {});
 
@@ -146,26 +155,11 @@ std::shared_ptr<Tool> createFileReadTool();
 std::shared_ptr<Tool> createFileWriteTool();
 
 /**
- * @brief Creates a tool for text summarization
- *
- * @param llm The LLM interface to use
- * @return Pointer to tool
- */
-std::shared_ptr<Tool> createSummarizationTool(std::shared_ptr<LLMInterface> llm);
-
-/**
  * @brief Creates a tool for loading media from URLs or local files
  * @param llm The LLM interface to use
  * @return Pointer to tool
  */
 std::shared_ptr<Tool> createMediaLoaderTool(std::shared_ptr<LLMInterface> llm);
-
-/**
- * @brief Creates a tool for generating safe responses
- *
- * @return Pointer to tool
- */
-std::shared_ptr<Tool> createRespondTool();
 
 /**
  * @brief Creates a tool for fetching web page content

@@ -1,7 +1,7 @@
 # Example binaries
 cc_binary(
-    name = "actor_agent_example",
-    srcs = ["actor_agent_example.cpp"],
+    name = "combined_workflows_example",
+    srcs = ["combined_workflows_example.cpp"],
     deps = ["//:agents_cpp"],
     visibility = ["//visibility:public"],
 )
