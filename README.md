@@ -305,7 +305,7 @@ Don't let infrastructure slow you down. Our Pro version helps accelerate your ro
 ## Support
 
 - Email: support@runedge.ai
-- Discord: https://discord.gg/D5unWmt8
+- Discord: https://discord.gg/vbxMMWegxd
 
 ## Star History
 
